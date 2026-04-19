@@ -101,8 +101,10 @@ def run_pipeline() -> None:
             num_detections = len(result.boxes)
 
             confidence_score_avg = 0.0
+            accuracy = 0.0
             if num_detections > 0 and result.boxes.conf is not None:
                 confidence_score_avg = float(result.boxes.conf.mean())
+                accuracy = float(result.boxes.conf.max()) * 100.0
 
             frame_drop_rate_percent = 0.0
             if source_fps is not None:
@@ -123,6 +125,7 @@ def run_pipeline() -> None:
                 "temperature": round(hw["temperature"], 1),
                 "num_detections": num_detections,
                 "confidence_score_avg": round(confidence_score_avg, 4),
+                "accuracy": round(accuracy, 2),
                 "frame_drop_rate_percent": round(frame_drop_rate_percent, 2),
             }
             logger.log(row)

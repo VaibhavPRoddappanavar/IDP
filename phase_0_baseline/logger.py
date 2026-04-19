@@ -20,6 +20,7 @@ CSV_COLUMNS = [
     "temperature",
     "num_detections",
     "confidence_score_avg",
+    "accuracy",
     "frame_drop_rate_percent",
 ]
 
