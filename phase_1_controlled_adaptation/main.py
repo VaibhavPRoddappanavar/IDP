@@ -99,6 +99,7 @@ def run_pipeline() -> None:
             "fps_sum": 0.0,
             "gpu_sum": 0.0,
             "temp_sum": 0.0,
+            "acc_sum": 0.0,
         }
         for mode_name in MODE_SEQUENCE
     }
@@ -142,8 +143,10 @@ def run_pipeline() -> None:
 
             num_detections = len(result.boxes)
             confidence_score_avg = 0.0
+            accuracy = 0.0
             if num_detections > 0 and result.boxes.conf is not None:
                 confidence_score_avg = float(result.boxes.conf.mean())
+                accuracy = float(result.boxes.conf.max()) * 100.0
 
             processed_frames += 1
             frames_to_skip = int(mode_cfg["skip"])
@@ -168,6 +171,7 @@ def run_pipeline() -> None:
                 "temperature": round(hw["temperature"], 1),
                 "num_detections": num_detections,
                 "confidence_score_avg": round(confidence_score_avg, 4),
+                "accuracy": round(accuracy, 2),
                 "source_frames_seen": source_frames_seen,
                 "processed_frames": processed_frames,
                 "intentional_skips_total": intentional_skips_total,
@@ -182,6 +186,7 @@ def run_pipeline() -> None:
             stats["fps_sum"] += fps
             stats["gpu_sum"] += hw["gpu_usage_percent"]
             stats["temp_sum"] += hw["temperature"]
+            stats["acc_sum"] += accuracy
 
             if SHOW_DISPLAY:
                 annotated = draw_detections(frame, result, fps, latency_ms)
@@ -231,12 +236,13 @@ def run_pipeline() -> None:
             avg_fps = stats["fps_sum"] / count
             avg_gpu = stats["gpu_sum"] / count
             avg_temp = stats["temp_sum"] / count
+            avg_acc = stats["acc_sum"] / count
             p95_latency = _percentile(stats["latency_ms"], 95.0)
 
             print(
                 f"  {mode_name}: frames={count} | avg_fps={avg_fps:.2f} "
                 f"| p95_latency_ms={p95_latency:.2f} | avg_gpu={avg_gpu:.1f}% "
-                f"| avg_temp={avg_temp:.1f}C"
+                f"| avg_temp={avg_temp:.1f}C | avg_acc={avg_acc:.2f}%"
             )
 
         print(f"\n[INFO] CSV saved to: {OUTPUT_CSV}")

@@ -24,6 +24,7 @@ CSV_COLUMNS = [
     "temperature",
     "num_detections",
     "confidence_score_avg",
+    "accuracy",
     "source_frames_seen",
     "processed_frames",
     "intentional_skips_total",
