@@ -25,9 +25,9 @@ VIDEO_PATH = str(Path(__file__).resolve().parent.parent / "BaseModelTraining" / 
 OUTPUT_CSV = str(Path(__file__).resolve().parent / "output" / "logs.csv")
 
 USE_WEBCAM = False
-SHOW_DISPLAY = True
+SHOW_DISPLAY = False
 CONF_THRESHOLD = 0.25
-MODE_SWITCH_INTERVAL_SEC = 10.0
+MODE_SWITCH_INTERVAL_SEC = 5.0
 
 MODES = {
     "M0": {"imgsz": 640, "skip": 0},
@@ -113,7 +113,13 @@ def run_pipeline() -> None:
             source_frames_seen += 1
 
             elapsed_s = time.perf_counter() - run_start_time
-            mode_name, mode_cfg = _get_active_mode(elapsed_s)
+            if total_frames != "inf" and total_frames > 0:
+                frames_per_mode = max(1, total_frames // len(MODE_SEQUENCE))
+                idx = min((source_frames_seen - 1) // frames_per_mode, len(MODE_SEQUENCE) - 1)
+                mode_name = MODE_SEQUENCE[idx]
+                mode_cfg = MODES[mode_name]
+            else:
+                mode_name, mode_cfg = _get_active_mode(elapsed_s)
             if mode_name != active_mode_name:
                 active_mode_name = mode_name
                 frames_to_skip = 0

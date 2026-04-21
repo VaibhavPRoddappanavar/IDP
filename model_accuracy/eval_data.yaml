@@ -1,0 +1,13 @@
+names:
+- pothole
+nc: 1
+path: /Users/vishalbhat/RVCE/SEM 6/IDP project/IDP/model_accuracy/dataset
+roboflow:
+  license: ODbL v1.0
+  project: pothole-voxrl
+  url: https://universe.roboflow.com/brad-dwyer/pothole-voxrl/dataset/1
+  version: 1
+  workspace: brad-dwyer
+test: test/images
+train: train/images
+val: valid/images
