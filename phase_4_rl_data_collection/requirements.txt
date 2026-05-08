@@ -1,0 +1,6 @@
+ultralytics
+opencv-python
+psutil
+wmi; sys_platform == 'win32'
+pandas
+pyarrow

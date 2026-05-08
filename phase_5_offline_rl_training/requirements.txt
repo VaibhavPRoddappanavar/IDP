@@ -1,0 +1,5 @@
+d3rlpy==2.3.0
+pandas
+pyarrow
+scikit-learn
+torch
