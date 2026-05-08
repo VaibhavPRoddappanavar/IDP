@@ -4,7 +4,7 @@
 /BaseModelTraining/test/test_video_1.mp4
 /phase_0_baseline/__pycache__/*
 /phase_1_controlled_adaptation/__pycache__
-
+__pycache__
 /runs
 /model_accuracy/dataset
 /model_accuracy/runs
