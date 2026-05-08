@@ -10,7 +10,7 @@ def load_csv(filepath: str) -> dict:
         "latency_ms": [],
         "ram_usage_percent": [],
         "cpu_usage_percent": [],
-        "accuracy": [],
+        "confidence_pct": [],
         "frame_count": 0
     }
     
@@ -23,17 +23,24 @@ def load_csv(filepath: str) -> dict:
         for row in reader:
             data["frame_count"] += 1
             
-            # Backward compatibility: if you use a CSV generated before we added 'accuracy'
-            # (like logs_macbook.csv), we estimate it from confidence_score_avg * 100
-            if "accuracy" not in row and "confidence_score_avg" in row:
+            # Normalize all CSVs onto the same metric: average confidence per frame.
+            # Prefer confidence_score_avg when available, and only fall back to the
+            # legacy accuracy field if a CSV does not expose confidence_score_avg.
+            if "confidence_score_avg" in row:
                 conf = row.get("confidence_score_avg", "0")
                 try:
-                    row["accuracy"] = float(conf) * 100.0
+                    row["confidence_pct"] = float(conf) * 100.0
                 except ValueError:
-                    row["accuracy"] = 0.0
+                    row["confidence_pct"] = 0.0
+            elif "accuracy" in row:
+                conf = row.get("accuracy", "0")
+                try:
+                    row["confidence_pct"] = float(conf)
+                except ValueError:
+                    row["confidence_pct"] = 0.0
 
             # Safely cast and append. If empty/missing fallback to 0.0
-            for key in ["fps", "latency_ms", "ram_usage_percent", "cpu_usage_percent", "accuracy"]:
+            for key in ["fps", "latency_ms", "ram_usage_percent", "cpu_usage_percent", "confidence_pct"]:
                 val = row.get(key, "0")
                 try:
                     data[key].append(float(val) if val else 0.0)
@@ -42,7 +49,7 @@ def load_csv(filepath: str) -> dict:
 
     # Calculate averages
     averages = {"frame_count": data["frame_count"]}
-    for key in ["fps", "latency_ms", "ram_usage_percent", "cpu_usage_percent", "accuracy"]:
+    for key in ["fps", "latency_ms", "ram_usage_percent", "cpu_usage_percent", "confidence_pct"]:
         if data[key]:
             averages[key] = sum(data[key]) / len(data[key])
         else:
@@ -51,69 +58,70 @@ def load_csv(filepath: str) -> dict:
     return averages
 
 
-def print_comparison(baseline: dict, target: dict, b_name: str, t_name: str):
+def print_comparison(baseline: dict, targets: list, b_name: str):
     """Prints a structured terminal report mapping the differences."""
     
-    print("\n" + "="*65)
-    print(f" BENCHMARK COMPARISON REPORT ".center(65, "="))
-    print("="*65)
-    print(f"{'Metric':<20} | {b_name[:12]:<12} | {t_name[:12]:<12} | {'Difference':<12}")
-    print("-" * 65)
+    num_t = len(targets)
+    width = 36 + (27 * num_t)
+    print("\n" + "="*width)
+    print(f" BENCHMARK COMPARISON REPORT ".center(width, "="))
+    print("="*width)
+    
+    header = f"{'Metric':<20} | {b_name[:12]:<12}"
+    for t_name, _ in targets:
+        header += f" | {t_name[:12]:<12} | {'Difference':<10}"
+    print(header)
+    print("-" * width)
 
-    def diff_str(bl, tg, higher_is_better=True, absolute=False):
+    def diff_str(bl, tg, absolute=False):
         if bl == 0: return "N/A"
-        
         if absolute:
             diff = tg - bl
-            prefix = "+" if diff > 0 else ""
-            return f"{prefix}{diff:.1f}"
-
+            return f"{'+' if diff > 0 else ''}{diff:.1f}"
         percent = ((tg - bl) / bl) * 100
-        prefix = "+" if percent > 0 else ""
-        return f"{prefix}{percent:.1f}%"
+        return f"{'+' if percent > 0 else ''}{percent:.1f}%"
 
-    # FPS (Higher = Better)
-    b_fps = baseline['fps']
-    t_fps = target['fps']
-    print(f"{'Average FPS':<20} | {b_fps:<12.1f} | {t_fps:<12.1f} | {diff_str(b_fps, t_fps, True)}")
+    def row_str(m_name, b_val, key, absolute=False, prec=1):
+        row = f"{m_name:<20} | {b_val:<12.{prec}f}"
+        for _, t_data in targets:
+            t_val = t_data[key]
+            d_str = diff_str(b_val, t_val, absolute)
+            row += f" | {t_val:<12.{prec}f} | {d_str:<10}"
+        return row
 
-    # Latency (Lower = Better)
-    b_lat = baseline['latency_ms']
-    t_lat = target['latency_ms']
-    print(f"{'Avg Latency (ms)':<20} | {b_lat:<12.1f} | {t_lat:<12.1f} | {diff_str(b_lat, t_lat, False)}")
+    # Print rows
+    print(row_str('Average FPS', baseline['fps'], 'fps', False, 1))
+    print(row_str('Avg Latency (ms)', baseline['latency_ms'], 'latency_ms', False, 1))
+    print(row_str('Avg CPU Usage (%)', baseline['cpu_usage_percent'], 'cpu_usage_percent', True, 1))
+    print(row_str('Avg RAM Usage (%)', baseline['ram_usage_percent'], 'ram_usage_percent', True, 1))
 
-    # CPU/RAM Usage (Absolute difference is usually more readable for percentages)
-    b_cpu = baseline['cpu_usage_percent']
-    t_cpu = target['cpu_usage_percent']
-    print(f"{'Avg CPU Usage (%)':<20} | {b_cpu:<12.1f} | {t_cpu:<12.1f} | {diff_str(b_cpu, t_cpu, absolute=True)}%")
-    
-    b_ram = baseline['ram_usage_percent']
-    t_ram = target['ram_usage_percent']
-    print(f"{'Avg RAM Usage (%)':<20} | {b_ram:<12.1f} | {t_ram:<12.1f} | {diff_str(b_ram, t_ram, absolute=True)}%")
-
-    print("-" * 65)
-    # Accuracy (Higher is better)
-    b_acc = baseline['accuracy']
-    t_acc = target['accuracy']
-    print(f"{'Precision Acc (%)':<20} | {b_acc:<12.2f} | {t_acc:<12.2f} | {diff_str(b_acc, t_acc, True)}")
-    print("="*65)
+    print("-" * width)
+    # Normalized confidence (Higher is better)
+    print(row_str('Avg Confidence (%)', baseline['confidence_pct'], 'confidence_pct', False, 2))
+    print("="*width)
     
     # Textual Conclusion
-    print("\n[CONCLUSION]")
-    if t_acc < (b_acc - 1.0):
-        acc_drop = b_acc - t_acc
-        print(f"⚠️ Model accuracy dropped by {acc_drop:.1f}% compared to baseline.")
-        print("   (Expected behavior if targeting an edge device using quantization/smaller models).")
-    elif t_acc > (b_acc + 1.0):
-        print("✅ Target achieved higher confidence scores overall.")
-    else:
-        print("✅ Detection Accuracy is identical/negligible change (Same mathematical operations).")
+    for t_name, t_data in targets:
+        print(f"\n[CONCLUSION FOR {t_name}]")
+        t_acc = t_data['confidence_pct']
+        b_acc = baseline['confidence_pct']
+        t_fps = t_data['fps']
+        b_fps = baseline['fps']
+        
+        if t_acc < (b_acc - 1.0):
+            acc_drop = b_acc - t_acc
+            print(f"⚠️ Average confidence dropped by {acc_drop:.1f}% compared to baseline.")
+            print("   (Expected behavior if targeting an edge device using quantization/smaller models).")
+        elif t_acc > (b_acc + 1.0):
+            print("✅ Target achieved higher average confidence overall.")
+        else:
+            print("✅ Average confidence is identical/negligible change (Same mathematical operations).")
 
-    if t_fps < b_fps:
-        fps_drop = b_fps - t_fps
-        print(f"⚠️ Target runs {fps_drop:.1f} FPS slower than the baseline ({(1 - t_fps/b_fps)*100:.1f}% speed reduction).")
-    else:
-        print(f"🚀 Target runs FASTER than the baseline by {t_fps - b_fps:.1f} FPS!")
+        if t_fps < b_fps:
+            fps_drop = b_fps - t_fps
+            print(f"⚠️ Target runs {fps_drop:.1f} FPS slower than the baseline ({(1 - t_fps/b_fps)*100:.1f}% speed reduction).")
+        else:
+            print(f"🚀 Target runs FASTER than the baseline by {t_fps - b_fps:.1f} FPS!")
 
     print("")
 
@@ -121,18 +129,22 @@ def print_comparison(baseline: dict, target: dict, b_name: str, t_name: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Compare YOLO benchmark CSV logs.")
     parser.add_argument("--baseline", type=str, default="output/logs_macbook.csv", help="Path to baseline CSV (e.g., MacBook)")
-    parser.add_argument("--target", type=str, default="output/logs.csv", help="Path to target CSV (e.g., RasPi)")
+    parser.add_argument("--target", type=str, nargs='+', default=["output/logs.csv"], help="Path to one or more target CSVs")
     
     args = parser.parse_args()
 
     try:
         baseline_stats = load_csv(args.baseline)
-        target_stats = load_csv(args.target)
         
+        targets = []
+        for t_path in args.target:
+            t_stats = load_csv(t_path)
+            t_name = Path(t_path).stem
+            targets.append((t_name, t_stats))
+            
         b_name = Path(args.baseline).stem
-        t_name = Path(args.target).stem
         
-        print_comparison(baseline_stats, target_stats, b_name, t_name)
+        print_comparison(baseline_stats, targets, b_name)
     except FileNotFoundError as e:
         print(f"[ERROR] {e}")
-        print("Make sure both CSV files exist before running.")
+        print("Make sure all CSV files exist before running.")
