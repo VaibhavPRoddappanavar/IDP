@@ -30,6 +30,8 @@ USE_WEBCAM = False
 SHOW_DISPLAY = True
 CONF_THRESHOLD = 0.25
 ACTION_INTERVAL_FRAMES = 5
+MAX_RUNTIME_MINUTES = 60
+MAX_TRANSITIONS = 20000
 # ======================================================================
 
 class FPSCounter:
@@ -76,11 +78,21 @@ def run_pipeline():
     prev_action = None
     accumulated_accuracy = 0.0
     accumulated_frames = 0
+    transitions_logged = 0
+    run_start_time = time.perf_counter()
 
     print("[INFO] Starting Continuous RL Data Collection...")
 
     try:
         while True:
+            elapsed_minutes = (time.perf_counter() - run_start_time) / 60.0
+            if elapsed_minutes >= MAX_RUNTIME_MINUTES:
+                print(f"\n[INFO] Auto-stopping: Reached max runtime of {MAX_RUNTIME_MINUTES} minutes.")
+                break
+            if transitions_logged >= MAX_TRANSITIONS:
+                print(f"\n[INFO] Auto-stopping: Reached max transitions of {MAX_TRANSITIONS}.")
+                break
+
             ret, frame = cap.read()
             if not ret:
                 if not USE_WEBCAM:
@@ -145,8 +157,9 @@ def run_pipeline():
                         "done": False
                     }
                     logger.log_transition(transition)
+                    transitions_logged += 1
                     
-                    print(f"[TRANSITION] Action(imgsz={prev_action['imgsz']}, skip={prev_action['skip_prob']:.2f}) -> Reward: {reward:.2f}")
+                    print(f"[TRANSITION] {transitions_logged}/{MAX_TRANSITIONS} Action(imgsz={prev_action['imgsz']}, skip={prev_action['skip_prob']:.2f}) -> Reward: {reward:.2f}")
 
                 # 3. Sample New Action (A_t)
                 prev_action = controller.sample_action()
