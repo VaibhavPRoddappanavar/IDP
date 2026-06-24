@@ -24,8 +24,8 @@ from utils import FPSCounter, draw_detections
 # ======================================================================
 # CONFIGURATION — all paths hard-coded for one-command execution
 # ======================================================================
-MODEL_PATH = str(Path(__file__).resolve().parent.parent / "BaseModelTraining" / "test" / "best.pt")
-VIDEO_PATH = str(Path(__file__).resolve().parent.parent / "BaseModelTraining" / "test" / "test_video_1.mp4")
+MODEL_PATH = str(Path(__file__).resolve().parent.parent / "BaseModelTraining" / "test" / "best_new_model.pt")
+VIDEO_PATH = str(Path(__file__).resolve().parent.parent / "BaseModelTraining" / "test" / "Video1GPSMapCamera.mp4")
 OUTPUT_CSV = str(Path(__file__).resolve().parent / "output" / "logs.csv")
 
 # Inference settings (FIXED — baseline)
@@ -133,6 +133,13 @@ def run_pipeline() -> None:
             # --- Display (optional) ---
             if SHOW_DISPLAY:
                 annotated = draw_detections(frame, result, fps, latency_ms)
+                
+                # Resize the image itself to ensure it fits on the screen
+                h, w = annotated.shape[:2]
+                if w > 1280 or h > 720:
+                    scale = min(1280 / w, 720 / h)
+                    annotated = cv2.resize(annotated, (int(w * scale), int(h * scale)))
+                
                 cv2.imshow("Phase 0 — Baseline Inference", annotated)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     print("[INFO] Quit requested by user.")

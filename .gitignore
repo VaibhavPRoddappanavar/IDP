@@ -9,3 +9,5 @@ __pycache__
 /model_accuracy/dataset
 /model_accuracy/runs
 /model_accuracy/venv
+/phase_6_evaluation/yolo
+*.mp4
