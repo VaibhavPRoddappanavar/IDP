@@ -96,35 +96,19 @@ def load_rl_policy():
     return policy, mean, std
 
 def query_rl_imgsz(policy, mean, std, cpu_pct, ram_pct, temp, fps, latency_ms):
-    # Keep the forward pass of the policy active
     try:
         state = np.array([[cpu_pct, ram_pct, temp, fps, latency_ms]], dtype=np.float32)
         norm  = (state - mean) / std
         with torch.no_grad():
-            _ = policy(torch.from_numpy(norm)).numpy()[0]
+            action = policy(torch.from_numpy(norm)).numpy()[0]
+        
+        # Map raw action output from [-1.0, 1.0] to imgsz range [256, 640]
+        mapped_imgsz = 256 + (((action[0] + 1.0) / 2.0) * (640 - 256))
+        # Round to the nearest multiple of 32 for YOLO compliance
+        return int(round(mapped_imgsz / 32) * 32)
     except Exception:
-        pass
-
-    # Heuristic stress mapping for ideal progressive adaptation
-    if temp > 0:
-        cpu_stress = max(0.0, min(1.0, (cpu_pct - 20) / 45.0))
-        temp_stress = max(0.0, min(1.0, (temp - 40) / 28.0))
-        stress = max(cpu_stress, temp_stress)
-    else:
-        stress = max(0.0, min(1.0, (cpu_pct - 20) / 50.0))
-
-    if stress < 0.15:
-        return 608
-    elif stress < 0.35:
-        return 480
-    elif stress < 0.55:
-        return 448
-    elif stress < 0.70:
-        return 416
-    elif stress < 0.85:
-        return 352
-    else:
-        return 320
+        # Fallback in case of runtime evaluation failure
+        return 640
 
 # ---- LABEL PARSING ----
 def parse_label(label_path):
