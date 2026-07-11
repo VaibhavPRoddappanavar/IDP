@@ -146,35 +146,19 @@ def load_rl_policy():
     return policy, mean, std
 
 def query_rl_imgsz(policy, mean, std, cpu, ram, temp, fps, latency_ms):
-    # Keep the forward pass of the policy active
     try:
         state = np.array([[cpu, ram, temp, fps, latency_ms]], dtype=np.float32)
         norm  = (state - mean) / std
         with torch.no_grad():
-            _ = policy(torch.from_numpy(norm)).numpy()[0]
+            action = policy(torch.from_numpy(norm)).numpy()[0]
+        
+        # Map raw action output from [-1.0, 1.0] to imgsz range [256, 640]
+        mapped_imgsz = 256 + (((action[0] + 1.0) / 2.0) * (640 - 256))
+        # Round to the nearest multiple of 32 for YOLO compliance
+        return int(round(mapped_imgsz / 32) * 32)
     except Exception:
-        pass
-
-    # Heuristic stress mapping for ideal progressive adaptation
-    if temp > 0:
-        cpu_stress = max(0.0, min(1.0, (cpu - 20) / 45.0))
-        temp_stress = max(0.0, min(1.0, (temp - 40) / 28.0))
-        stress = max(cpu_stress, temp_stress)
-    else:
-        stress = max(0.0, min(1.0, (cpu - 20) / 50.0))
-
-    if stress < 0.15:
-        return 608
-    elif stress < 0.35:
-        return 480
-    elif stress < 0.55:
-        return 448
-    elif stress < 0.70:
-        return 416
-    elif stress < 0.85:
-        return 352
-    else:
-        return 320
+        # Fallback in case of runtime evaluation failure
+        return 640
 
 # ============================================================
 # INFERENCE LOOP
@@ -383,14 +367,17 @@ def plot_bar_comparison(b_stats, r_stats, temp_available):
 
     # Delta annotation
     lower_better = {"fps":False,"latency_ms":True,"cpu_pct":True,"ram_pct":True,"temp":True}
+    units = {"fps": "FPS", "latency_ms": "ms", "cpu_pct": "%", "ram_pct": "%", "temp": "C"}
     for xi,(m,bv,rv) in enumerate(zip(metrics,b_means,r_means)):
         if bv == 0: continue
         lb  = lower_better.get(m, False)
         imp = improvement(bv, rv, lower_is_better=lb)
         colour = RL_CLR if imp >= 0 else "#ef5350"
-        sign   = "+" if imp >= 0 else ""
+        diff = rv - bv
+        unit = units.get(m, "")
+        unit_str = f" {unit}" if unit != "%" else "%"
         y_pos  = max(bv, rv) + max(bv,rv)*0.08
-        ax.text(xi, y_pos, f"{sign}{imp:.1f}%",
+        ax.text(xi, y_pos, f"{diff:+.1f}{unit_str}",
                 ha="center", va="bottom", fontsize=9, color=colour, fontweight="bold")
 
     ax.set_xticks(x); ax.set_xticklabels(labels, fontsize=11)
