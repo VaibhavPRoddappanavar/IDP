@@ -13,6 +13,12 @@
 \usepackage{float}
 \usepackage{lipsum} % For generating filler text if needed to expand sections, though we will provide real text.
 
+% Compatibility guard for IEEE Access class versions whose caption code
+% references this dimension register without declaring it.
+\makeatletter
+\@ifundefined{xfigwd}{\newlength{\xfigwd}}{}
+\makeatother
+
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 \begin{document}
@@ -425,49 +431,76 @@ Furthermore, combining the adaptive pipeline with TensorRT optimization yielded 
 \begin{thebibliography}{99}
 
 \bibitem{b1}
-M. Ren et al., ``An annotated street view image dataset for automated road damage detection (SVRDD),'' \textit{Nature Scientific Data}, Apr. 2024.
+R. Kothai and N. Prabakaran, ``Self Attention GAN and SWIN Transformer-Based Pothole Detection With Trust Region-Based LSM and Hough Line Transform for 2D to 3D Conversion,'' \textit{IEEE Access}, vol. 13, pp. 137695--137708, Aug. 2025, doi: 10.1109/ACCESS.2025.3595190.
 
 \bibitem{b2}
-S. Zhang et al., ``OBC-YOLOV8n: An improved road damage detection model with data augmentation,'' \textit{PeerJ Computer Science}, 2025.
+S. Kong, Q. Meng, X. Li, Z. Wang, X. Liu, and B. Li, ``Road Perception for Autonomous Driving: Pothole Detection in Complex Environments Based on Improved YOLOv8,'' \textit{IEEE Access}, vol. 13, pp. 80914--80929, May 2025, doi: 10.1109/ACCESS.2025.3566944.
 
 \bibitem{b3}
-S. Teerapittayanon, B. McDanel, and H. T. Kung, ``BranchyNet: Fast inference via early exiting from deep neural networks,'' in \textit{2016 23rd International Conference on Pattern Recognition (ICPR)}, Dec 2016, pp. 2464--2469.
+G. Shelke et al., ``Vision-Based Pothole Detection and Reporting System for Smart Cities (Leveraging YOLOv8-Seg and Predictive Maintenance Models),'' in \textit{Proc. IEEE Pune Section Int. Conf. (PuneCon)}, 2025, doi: 10.1109/PuneCon67554.2025.11379854.
 
 \bibitem{b4}
-X. Gao, Y. Zhao, L. Dudziak, R. Mullins, and C. Xu, ``Dynamic channel pruning: Feature boosting and suppression,'' in \textit{International Conference on Learning Representations}, 2019.
+K. Agarwal, S. Bhambri, V. K. Sridharan, N. Mohammed, H. Kohli, and J. A. Kapoor, ``Performance Evaluation of different Machine Learning Techniques for Pothole Detection,'' in \textit{Proc. IEEE Int. Conf. Contemporary Computing and Communications (InC4)}, 2025, doi: 10.1109/InC465408.2025.11256464.
 
 \bibitem{b5}
-A. Mutapcic and S. Boyd, ``Cutting-set methods for robust convex optimization with pessimizing oracles,'' \textit{Optimization Methods and Software}, vol. 24, no. 3, pp. 381--406, 2009.
+M. Yurdakul and S. Tasdemir, ``An Enhanced YOLOv8 Model for Real-Time and Accurate Pothole Detection and Measurement,'' arXiv preprint arXiv:2505.04207, May 2025.
 
 \bibitem{b6}
-M. Garcia et al., ``Edge computing in IoT for smart cities: Real-time services and infrastructure,'' \textit{All Multidisciplinary Journal}, Jul. 2025.
+Y. Hu et al., ``Lightweight Deep Learning for Real-Time Road Distress Detection on Mobile Devices,'' \textit{Nature Communications}, vol. 16, Art. no. 4212, May 2025.
 
 \bibitem{b7}
-A. M. Hayajneh et al., ``TinyML empowered transfer learning on the edge,'' White Rose ePrints, 2024.
+N. Yang, S. Chen, H. Zhang, and R. A. Berry, ``Beyond the Edge: An Advanced Exploration of Reinforcement Learning for Mobile Edge Computing, Its Applications, and Future Research Trajectories,'' \textit{IEEE Communications Surveys \& Tutorials}, vol. 27, no. 1, pp. 546--594, 2025, doi: 10.1109/COMST.2024.3405075.
 
 \bibitem{b8}
-B. Taylor, V. S. Marco, W. Wolff, Y. Elkhatib, and Z. Wang, ``Adaptive deep learning model selection on embedded systems,'' in \textit{Proceedings of the 19th ACM SIGPLAN/SIGOPS International Conference on Virtual Execution Environments}, 2018, pp. 31--43.
+K. Ye et al., ``Energy-Efficient Inference With Software--Hardware Co-Design for Sustainable Artificial Intelligence of Things,'' \textit{IEEE Internet of Things Journal}, vol. 11, no. 24, pp. 39170--39182, Dec. 2024, doi: 10.1109/JIOT.2024.3482288.
 
 \bibitem{b9}
-M. Yurdakul et al., ``An enhanced YOLOV8n model for real-time and accurate pothole detection and depth measurement,'' arXiv, 2025. [Online]. Available: https://arxiv.org/abs/2505.04207
+X. Chen, J. Cao, Y. Sahni, S. Jiang, and Z. Liang, ``Dynamic Task Offloading in Edge Computing Based on Dependency-Aware Reinforcement Learning,'' \textit{IEEE Transactions on Cloud Computing}, vol. 12, no. 2, pp. 594--608, Apr.--Jun. 2024, doi: 10.1109/TCC.2024.3381646.
 
 \bibitem{b10}
-S.D. RS et al., ``Pothole detection and instance segmentation using YOLOV8n,'' IEEE, Dec. 2024.
+G. P. B. et al., ``Accelerating Native Inference Model Performance in Edge Devices using TensorRT,'' in \textit{Proc. IEEE Recent Advances in Intelligent Computational Systems (RAICS)}, 2024, doi: 10.1109/RAICS61201.2024.10690032.
 
 \bibitem{b11}
-R.C.C.M. Santos et al., ``Real-time object detection performance analysis using YOLOv7-tiny on embedded hardware,'' IEEE, 2024.
+``Enhancing Infrastructure Monitoring: Pothole Detection in Road Images Using YOLOv8 and Open Datasets,'' in \textit{Proc. IEEE 6th Int. Conf. on Cybernetics and Intelligent System (ICORIS)}, 2024, doi: 10.1109/ICORIS63540.2024.10903697.
 
 \bibitem{b12}
-Y. Hu et al., ``Lightweight deep learning for real-time road distress detection with MobilityNet,'' PMC, May 2025.
+``Pothole Detection and Filling System Using Image Processing and Machine Learning,'' in \textit{Proc. Int. Conf. Smart Systems for Applications in Electrical Sciences (ICSSES)}, 2024, doi: 10.1109/ICSSES62373.2024.10561417.
 
 \bibitem{b13}
-A.R. Khouas et al., ``Training machine learning models at the edge: A survey,'' arXiv, Jul. 2024.
+S. D. RS et al., ``Pothole Detection and Instance Segmentation Using YOLO V8,'' in \textit{Proc. IEEE Int. Conf. IoT Based Control Networks and Intelligent Systems (ICICNIS)}, 2024, doi: 10.1109/ICICNIS64247.2024.10823139.
 
 \bibitem{b14}
-R. Rajagopal et al., ``Cross-platform edge AI made easy with ONNX Runtime,'' Microsoft Tech Community Blog, Nov. 2024.
+R. C. C. M. Santos, M. Coelho, and R. Oliveira, ``Real-Time Object Detection Performance Analysis Using YOLOv7 on Edge Devices,'' \textit{IEEE Latin America Transactions}, vol. 22, no. 10, pp. 799--805, Oct. 2024, doi: 10.1109/TLA.2024.10705971.
 
 \bibitem{b15}
-Multiple Authors, ``Internet of Things (IoT) solutions for smart transportation infrastructure,'' \textit{Propulsion Tech Journal}, Sep. 2024.
+R. M. et al., ``An Annotated Street View Image Dataset for Automated Road Damage Detection (SVRDD),'' \textit{Scientific Data}, vol. 11, Art. no. 407, Apr. 2024.
+
+\bibitem{b16}
+A. R. Khouas et al., ``Training Machine Learning Models at the Edge: A Survey,'' arXiv preprint, Jul. 2024.
+
+\bibitem{b17}
+``AdaDet: An Adaptive Object Detection System Based on Early-Exit Neural Networks,'' \textit{IEEE Transactions on Cognitive and Developmental Systems}, vol. 16, no. 1, pp. 332--345, Feb. 2024, doi: 10.1109/TCDS.2023.3274214.
+
+\bibitem{b18}
+X. Zhang, Y. Teng, N. Wang, B. Sun, and G. Hu, ``Accelerating Deep Neural Network Tasks Through Edge-Device Adaptive Inference,'' in \textit{Proc. IEEE 34th Annual Int. Symp. Personal, Indoor and Mobile Radio Communications (PIMRC)}, 2023, pp. 1--6, doi: 10.1109/PIMRC56721.2023.10293996.
+
+\bibitem{b19}
+S. Maity, R. Roy, A. Majumder, S. Dey, and A. R. Hota, ``Future-Aware Dynamic Thermal Management in CPU-GPU Embedded Platforms,'' in \textit{Proc. IEEE Real-Time Systems Symposium (RTSS)}, 2022, doi: 10.1109/RTSS55097.2022.00041.
+
+\bibitem{b20}
+G. Verma, Y. Gupta, A. M. Malik, and B. Chapman, ``Performance Evaluation of Deep Learning Compilers for Edge Inference,'' in \textit{Proc. IEEE Int. Parallel and Distributed Processing Symposium Workshops (IPDPSW)}, 2021, pp. 858--865, doi: 10.1109/IPDPSW52791.2021.00128.
+
+\bibitem{b21}
+X. Gao, Y. Zhao, L. Dudziak, R. Mullins, and C. Xu, ``Dynamic Channel Pruning: Feature Boosting and Suppression,'' in \textit{Proc. Int. Conf. Learning Representations (ICLR)}, 2019.
+
+\bibitem{b22}
+B. Taylor, V. S. Marco, W. Wolff, Y. Elkhatib, and Z. Wang, ``Adaptive Deep Learning Model Selection on Embedded Systems,'' in \textit{Proc. 19th ACM SIGPLAN/SIGOPS Int. Conf. Virtual Execution Environments}, 2018, pp. 31--43.
+
+\bibitem{b23}
+S. Teerapittayanon, B. McDanel, and H. T. Kung, ``BranchyNet: Fast Inference via Early Exiting from Deep Neural Networks,'' in \textit{Proc. 23rd Int. Conf. Pattern Recognition (ICPR)}, 2016, pp. 2464--2469.
+
+\bibitem{b24}
+M. Mutapcic and S. Boyd, ``Cutting-Set Methods for Robust Convex Optimization with Pessimizing Oracles,'' \textit{Optimization Methods and Software}, vol. 24, no. 3, pp. 381--406, 2009.
 
 \end{thebibliography}
 
