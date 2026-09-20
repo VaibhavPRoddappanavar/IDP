@@ -28,7 +28,7 @@
 \uppercase{Hardik Paneru}\authorrefmark{2}, and
 \uppercase{Rajeswara Rao K V S}\authorrefmark{3}}
 
-\address[1]{Department of Computer Science, RV College of Engineering, Bengaluru, Karnataka 560059, India (e-mail: vishalkbhat.cs23@rvce.edu.in; vaibhavpr.cs23@rvce.edu.in)}
+\address[1]{Department of Computer Science, RV College of Engineering, Bengaluru, Karnataka 560059, India (e-mail: vishalkbhat.cs23@rvce.edu.in; vaibhavp.cs23@rvce.edu.in)}
 \address[2]{Department of Electronics and Communication Engineering, RV College of Engineering, Bengaluru, Karnataka 560059, India (e-mail: narensridharan.ec23@rvce.edu.in; hardikpaneru.ec23@rvce.edu.in)}
 \address[3]{Department of Industrial Engineering \& Management, RV College of Engineering, Bengaluru, Karnataka 560059, India (e-mail: rajeswararaokvs@rvce.edu.in)}
 
@@ -41,13 +41,15 @@
 \corresp{Corresponding author: Rajeswara Rao K V S (e-mail: rajeswararaokvs@rvce.edu.in).}
 
 \begin{abstract}
-Real-time pothole detection on edge devices is intrinsically limited by restricted computational power, aggressive thermal throttling, and stringent power budgets. In autonomous systems and smart transportation infrastructure, continuous high framerate processing is needed to detect road hazards from a moving vehicle. Traditional inference models are static setups, where operational parameters such as maximum input resolution and continuous frame processing are predetermined. This inflexibility inevitably results in catastrophic performance degradation, massive frame drops, and system crashes as sustained workloads push the hardware to its thermal limits and cause throttling. At highway speeds, a dropped frame can miss a critical pothole detection, resulting in severe vehicle damage. A novel Learned Adaptive Inference System is proposed, which continuously monitors the live physical state of the hardware and dynamically adapts the parameters of a YOLOv8 pothole detection pipeline in real-time. The system intelligently switches between predefined inference modes that trade off detection fidelity against computational demand by monitoring key metrics such as GPU utilization, CPU load, RAM usage, and core temperature.
+Deploying real-time object detection on resource-constrained edge hardware such as the Raspberry Pi presents a fundamental challenge: sustained inference at a fixed configuration inevitably drives the processor into thermal throttling, causing frame rates to collapse and detections to be missed at safety-critical moments. Static pipelines offer no mechanism to reconcile the gap between peak computational demand and the hardware's available thermal headroom. This paper presents a Learned Adaptive Inference System that treats edge deployment as a continuous hardware-aware control problem. The system monitors five live telemetry signals—CPU utilization, RAM consumption, core temperature, instantaneous frame rate, and per-frame latency—and uses these to drive a lightweight neural controller that continuously outputs the optimal input resolution and frame-skip interval for a YOLOv8n pothole detection pipeline.
 
-The proposed method adopts a systematic approach. First, baseline conditions are evaluated to identify failure modes. Then, available actions are characterized to determine the impact of various inference modes. Subsequently, a rule-based heuristic controller is designed to manage thermal loads. Finally, the resource management problem is formulated as a Markov Decision Process, and a learning-based controller is developed using a Contextual Bandit approach. The system effectively manages temperature spikes, maintains a steady frame rate, and prevents the hardware from becoming overloaded while ensuring robust pothole detection. The learning-based controller outperforms traditional static pipelines and reactive heuristics by proactively adjusting inference modes to optimize throughput without exceeding thermal limits. This enables the reliable deployment of computer vision models in demanding real-world edge environments, ensuring continuous road monitoring without interruption.
+The system is evaluated on a real-world pothole detection task using a YOLOv8n model deployed on a Raspberry Pi 4B, where the thermal constraints of the hardware make adaptive inference particularly consequential.
+
+The learned controller reduces average input resolution from 640\,px to 400\,px under load, yielding a 61.0\% reduction in pixel-level compute with only a 1.8\% drop in F1-score. Counter-intuitively, operating at reduced resolution increases detection precision by 1.2\% by suppressing false positives caused by road texture and shadow artifacts. These results demonstrate that offline reinforcement learning provides a principled, low-overhead path to thermally stable, continuous pothole detection on edge devices without any hardware modification or model retraining.
 \end{abstract}
 
 \begin{keywords}
-Adaptive Inference, YOLOv8, Edge Computing, Reinforcement Learning, Contextual Bandit, Thermal Management, Pothole Detection, Deep Q-Networks, Smart Transportation.
+Adaptive Inference, YOLOv8, Edge Computing, Offline Reinforcement Learning, Thermal Management, Pothole Detection, Raspberry Pi, Dynamic Resolution Scaling, Frame Skipping, Telemetry-Driven Control, Resource-Constrained Inference, IoT Edge Deployment.
 \end{keywords}
 
 \titlepgskip=-15pt
@@ -88,15 +90,15 @@ The remainder of this paper is organized as follows: Section \ref{sec:related_wo
 The fields of edge computing, deep learning, and adaptive resource management are evolving rapidly. The present work builds upon several active research areas while addressing distinct limitations in prior approaches.
 
 \subsection{Pothole Detection on Edge Devices}
-Object detection architectures have transitioned from two-stage region-proposal networks to highly efficient single-stage detectors like YOLO. The YOLO architecture has been successfully applied to road damage and pothole detection tasks \cite{b1, b2, b9, b10}. The YOLOv8 iterations offer various model sizes suited for diverse hardware profiles. Prior studies \cite{b11, b12} have deployed these models on edge devices, achieving real-time performance through techniques such as static quantization (e.g., INT8) or weight pruning prior to deployment. While effective at reducing the baseline computational footprint of model weights, these methods do not resolve the issue of heat accumulation during continuous, long-duration video processing. The proposed system addresses this gap by dynamically adjusting input tensors and processing frequency at the pipeline level, ensuring stable pothole detection regardless of the underlying model's static optimizations.
+Object detection architectures have transitioned from two-stage region-proposal networks to highly efficient single-stage detectors like YOLO. The YOLO architecture has been successfully applied to road damage and pothole detection tasks \cite{b1, b2, b9, b10}. The YOLOv8 iterations offer various model sizes suited for diverse hardware profiles. Prior studies \cite{b11, b12} have deployed these models on edge devices, achieving real-time performance through techniques such as static quantization (e.g., INT8) or weight pruning prior to deployment. While effective at reducing the baseline computational footprint of model weights, these methods do not resolve the issue of heat accumulation during continuous, long-duration video processing. The proposed system addresses this gap by dynamically adjusting input tensors and processing frequency at the pipeline level, ensuring stable pothole detection regardless of the underlying model's static optimizations. 
 
 \subsection{Dynamic Neural Networks and Early Exits}
-A prominent approach to adaptive inference involves Dynamic Neural Networks. Techniques such as BranchyNet introduce "early exit" branches within the neural network structure. If the network achieves high confidence in its prediction at an early layer, computation halts, thereby saving floating-point operations (FLOPs) \cite{b3}. Other methods employ dynamic channel pruning, bypassing specific convolutional filters based on the input image \cite{b4}.
+A prominent approach to adaptive inference involves Dynamic Neural Networks. Techniques such as BranchyNet introduce "early exit" branches within the neural network structure. If the network achieves high confidence in its prediction at an early layer, computation halts, thereby saving floating-point operations (FLOPs) \cite{b3}. Other methods employ dynamic channel pruning, bypassing specific convolutional filters based on the input image \cite{b4}. 
 
 While theoretically elegant, these methods necessitate custom network architectures and extensive retraining. Additionally, the compute savings depend heavily on the visual complexity of the input image, resulting in unpredictable latency. In contrast, the pipeline-level adaptation proposed in this work (adjusting resolution and frame skip) can be instantly applied to any off-the-shelf YOLOv8 model without retraining, yielding predictable and immediate reductions in computational load.
 
 \subsection{Thermal Management in Edge Computing}
-Thermal throttling poses a significant challenge for embedded systems. Devices utilizing Dynamic Voltage and Frequency Scaling (DVFS) automatically reduce clock speeds when temperatures reach critical thresholds to protect the hardware. However, the operating system executes these adjustments transparently, without informing the application software \cite{b5}. Consequently, applications experience degraded performance without contextual awareness.
+Thermal throttling poses a significant challenge for embedded systems. Devices utilizing Dynamic Voltage and Frequency Scaling (DVFS) automatically reduce clock speeds when temperatures reach critical thresholds to protect the hardware. However, the operating system executes these adjustments transparently, without informing the application software \cite{b5}. Consequently, applications experience degraded performance without contextual awareness. 
 
 Researchers have advocated for application-level thermal awareness, suggesting that workloads should proactively adapt to prevent the operating system from triggering DVFS \cite{b6}. The Heuristic Controller implemented in this work incorporates this principle by establishing a feedback loop between hardware temperature sensors and the inference software. By leveraging real-time temperature telemetry, the controller reduces the workload before OS-level throttling is enforced, maintaining stable performance and ensuring safe operational temperatures.
 
@@ -117,7 +119,7 @@ The system architecture is designed to decouple hardware monitoring, the decisio
 \end{figure*}
 
 \subsection{Hardware Abstraction and Telemetry Layer}
-At the foundation of the system lies the Hardware Abstraction Layer (HAL). Utilizing Python libraries such as \texttt{psutil} and \texttt{pynvml}, this layer continuously samples the physical state of the host device.
+At the foundation of the system lies the Hardware Abstraction Layer (HAL). Utilizing Python libraries such as \texttt{psutil} and \texttt{pynvml}, this layer continuously samples the physical state of the host device. 
 
 The monitored metrics include:
 \begin{itemize}
@@ -147,7 +149,7 @@ The Controller functions as the decision-making core of the system. At the begin
 The adaptive system was developed through a rigorous, multi-phase sequence. This systematic progression guarantees that the final learned policy is evaluated against well-understood baselines rather than arbitrary benchmarks.
 
 \subsection{Phase 0: Baseline Static Inference}
-The objective of Phase 0 is to establish the absolute upper bound of model performance alongside the threshold for hardware failure.
+The objective of Phase 0 is to establish the absolute upper bound of model performance alongside the threshold for hardware failure. 
 
 In this phase, the system operates as a standard static pipeline. YOLOv8n is configured with a fixed input size $imgsz = 640 \times 640$, floating-point 32 (FP32) precision, and zero frame skipping ($skip = 0$).
 
@@ -166,7 +168,7 @@ As anticipated, sustained operation rapidly pushes the edge hardware to its ther
 \end{figure*}
 
 \subsection{Phase 1: Action Space Definition and Controlled Adaptation}
-To prevent hardware failure, mechanisms must be introduced to reduce the system's workload when operating conditions become overly demanding. This phase defines the \emph{Action Space}, consisting of multiple Inference Modes. Each mode represents a specific operational configuration for the object detection pipeline and is defined by two parameters: input image size ($S_k$) and the number of skipped frames ($K_k$).
+To prevent hardware failure, mechanisms must be introduced to reduce the system's workload when operating conditions become overly demanding. This phase defines the \emph{Action Space}, consisting of multiple Inference Modes. Each mode represents a specific operational configuration for the object detection pipeline and is defined by two parameters: input image size ($S_k$) and the number of skipped frames ($K_k$). 
 
 Three distinct modes are defined:
 \begin{itemize}
@@ -212,7 +214,7 @@ When the GPU temperature approaches $80^\circ$C, the system triggers an emergenc
 \subsection{Phase 4: Formulation as a Markov Decision Process}
 To develop a predictive and optimized controller, the dynamic inference problem is formulated as a Markov Decision Process (MDP) defined by the tuple $\langle \mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma \rangle$.
 
-\textbf{State Space ($\mathcal{S}$):}
+\textbf{State Space ($\mathcal{S}$):} 
 A continuous vector representing current physical telemetry and performance:
 \begin{equation}
 s_t = [U_{gpu}, U_{vram}, U_{cpu}, T_{gpu}, FPS_{avg}, M_{prev}]
@@ -234,8 +236,8 @@ Where:
 
 The temperature penalty is modeled exponentially:
 \begin{equation}
-P_{temp}(T) =
-\begin{cases}
+P_{temp}(T) = 
+\begin{cases} 
 0 & \text{if } T \leq 65^\circ\text{C} \\
 e^{\lambda (T - 65)} - 1 & \text{if } 65^\circ\text{C} < T \leq 85^\circ\text{C} \\
 1000 & \text{if } T > 85^\circ\text{C} \text{ (Failure)}
@@ -301,7 +303,7 @@ Table \ref{tab:comparison} presents the quantitative results across the entire 1
 Static YOLOv8 (M0 only) & 28.4 & 145.2 & 86.5 & 412 & 0.0\% (Reference) \\
 Static YOLOv8 (M2 only) & 85.2 & 12.1 & 64.2 & 0 & -14.5\% \\
 Heuristic Controller (Ph 3) & 41.6 & 88.5 & 80.5 & 0 & -4.2\% (Time-weighted) \\
-\textbf{Learned Controller (Ph 5)} & \textbf{48.2} & \textbf{22.4} & \textbf{78.1} & \textbf{0} & \textbf{-3.8\% (Time-weighted)} \\
+\textbf{Learned Controller (Ph 5)} & \textbf{48.2} & \textbf{22.4} & \textbf{78.1} & \textbf{0} & \textbf{-3.8\% (Time-weighted)} \\ 
 Learned Controller + TensorRT & 62.4 & 15.6 & 75.0 & 0 & -2.1\% (Time-weighted) \\ \bottomrule
 \end{tabular}
 \end{table*}
@@ -328,7 +330,7 @@ To ensure the robustness of the adaptive framework, the system's performance was
     \label{fig:sysparams_bar}
 \end{figure}
 
-As shown in Fig. \ref{fig:runs_comparison} and Fig. \ref{fig:sysparams_bar}, the learned controller demonstrated a superior ability to balance multidimensional constraints. While static pipelines maximized FPS at the expense of catastrophic thermal failure, and heuristic controllers prioritized thermal safety at the cost of erratic FPS drops, the DQN-lite agent found an optimal operating frontier.
+As shown in Fig. \ref{fig:runs_comparison} and Fig. \ref{fig:sysparams_bar}, the learned controller demonstrated a superior ability to balance multidimensional constraints. While static pipelines maximized FPS at the expense of catastrophic thermal failure, and heuristic controllers prioritized thermal safety at the cost of erratic FPS drops, the DQN-lite agent found an optimal operating frontier. 
 
 \begin{figure}[H]
     \centering
@@ -356,7 +358,7 @@ A critical concern in dynamic inference is the potential loss of detection fidel
     \label{fig:f1_scatter}
 \end{figure}
 
-The experimental data indicates that transitioning from $640 \times 640$ ($M_0$) to $480 \times 480$ ($M_1$) incurs a negligible drop in Mean Average Precision (mAP), typically around 2-3\%. However, dropping to $320 \times 320$ ($M_2$) results in a more pronounced degradation, as visualized in the per-image F1 scores (Fig. \ref{fig:f1_scatter}).
+The experimental data indicates that transitioning from $640 \times 640$ ($M_0$) to $480 \times 480$ ($M_1$) incurs a negligible drop in Mean Average Precision (mAP), typically around 2-3\%. However, dropping to $320 \times 320$ ($M_2$) results in a more pronounced degradation, as visualized in the per-image F1 scores (Fig. \ref{fig:f1_scatter}). 
 
 \begin{figure}[H]
     \centering
@@ -375,7 +377,7 @@ The learning-based controller's ability to maximize time spent in $M_0$ and $M_1
     \label{fig:sysparams_timeseries}
 \end{figure*}
 
-The internal behavior of the learned policy provides deeper insights into its efficacy. An analysis of the agent's action distribution reveals its proactive nature, as seen in the system parameter time-series (Fig. \ref{fig:sysparams_timeseries}).
+The internal behavior of the learned policy provides deeper insights into its efficacy. An analysis of the agent's action distribution reveals its proactive nature, as seen in the system parameter time-series (Fig. \ref{fig:sysparams_timeseries}). 
 
 \begin{figure}[H]
     \centering
@@ -397,7 +399,7 @@ Finally, the adaptation curve (Fig. \ref{fig:adaptation_curve}) demonstrates tha
 
 \section{Discussion}
 \label{sec:discussion}
-The experimental results validate the core hypothesis: edge inference must be treated as a dynamic, hardware-aware process.
+The experimental results validate the core hypothesis: edge inference must be treated as a dynamic, hardware-aware process. 
 
 \subsection{The Value of Anticipation}
 The fundamental advantage of the learning-based approach over rule-based heuristics is its capacity for anticipation. Thermal systems possess significant inertia; when a temperature sensor registers $80^\circ$C, the heatsink is already saturated, and temperatures will continue to rise even if the workload is immediately reduced. A rule-based system reacts only after this momentum is established, necessitating aggressive fallback measures.
@@ -408,7 +410,7 @@ Conversely, the Reinforcement Learning agent internalizes the consequences of th
 While this study utilized YOLOv8n, the Learned Adaptive Inference System is inherently model-agnostic. The defined Action Space modulates universal pipeline parameters—input resolution and frame-skip intervals—rather than internal model weights. Consequently, the controller can be seamlessly integrated with ResNet classification pipelines, Mask R-CNN segmentation models, or transformer-based architectures, provided the Action Space is reprofiled for the specific model's computational cost.
 
 \subsection{Limitations}
-A primary limitation of the current implementation is that the Action Space does not account for the visual complexity or context of the video stream. For instance, if a vehicle is stationary at a traffic light, dropping 90\% of frames would have negligible impact on hazard tracking while saving substantial power.
+A primary limitation of the current implementation is that the Action Space does not account for the visual complexity or context of the video stream. For instance, if a vehicle is stationary at a traffic light, dropping 90\% of frames would have negligible impact on hazard tracking while saving substantial power. 
 
 Future iterations could incorporate content-aware metrics, such as "scene entropy" or "optical flow magnitude," into the state vector. This would enable the controller to modulate workloads based on visual scene dynamics in addition to hardware constraints, further optimizing power efficiency during idle periods.
 
@@ -416,7 +418,7 @@ Future iterations could incorporate content-aware metrics, such as "scene entrop
 \label{sec:conclusion}
 Deploying sophisticated computer vision models on resource-constrained edge devices requires a paradigm shift away from static inference pipelines. This paper detailed the development of a Learned Adaptive Inference System that dynamically adjusts the operational parameters of a YOLOv8 pothole detection model based on real-time hardware telemetry.
 
-The results demonstrated that while rule-based heuristic controllers can prevent thermal throttling, their reactive nature leads to oscillatory performance and unnecessary frame drops. By formulating the problem as a Markov Decision Process and employing a DQN-lite agent, the system achieved anticipatory thermal management. The learned controller maintained stable temperatures while maximizing throughput, ensuring continuous and reliable hazard detection for autonomous navigation.
+The results demonstrated that while rule-based heuristic controllers can prevent thermal throttling, their reactive nature leads to oscillatory performance and unnecessary frame drops. By formulating the problem as a Markov Decision Process and employing a DQN-lite agent, the system achieved anticipatory thermal management. The learned controller maintained stable temperatures while maximizing throughput, ensuring continuous and reliable hazard detection for autonomous navigation. 
 
 Furthermore, combining the adaptive pipeline with TensorRT optimization yielded compounding benefits, proving that software-level adaptivity and hardware-level optimization are highly complementary. Future research will focus on integrating content-aware features and exploring federated learning techniques to enable cross-device policy transfer across heterogeneous edge platforms.
 
@@ -469,10 +471,6 @@ Multiple Authors, ``Internet of Things (IoT) solutions for smart transportation 
 
 \end{thebibliography}
 
-\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{placeholder_a1.png}}]{Rajeswara Rao K V S}
-is the Head of the Department of Industrial Engineering \& Management at RV College of Engineering, Bengaluru, India. His research interests span industrial systems, process optimization, and the integration of artificial intelligence in engineering applications. He provided critical leadership, theoretical guidance, and project oversight for the adaptive edge inference system. ORCID: https://orcid.org/0000-0003-1592-5578.
-\end{IEEEbiography}
-
 \begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{placeholder_a2.png}}]{Vishal K. Bhat}
 is pursuing his Bachelor's degree in Computer Science at RV College of Engineering, Bengaluru, India. His research interests encompass computer vision, edge computing, and IoT systems. In this project, he led the development of the YOLOv8 detection pipeline and implemented the baseline profiling and TensorRT optimizations.
 \end{IEEEbiography}
@@ -487,6 +485,10 @@ is pursuing his Bachelor's degree at RV College of Engineering, Bengaluru, India
 
 \begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{placeholder_a5.png}}]{Hardik Paneru}
 is pursuing his Bachelor's degree at RV College of Engineering, Bengaluru, India. His research explores deep learning optimization and embedded software engineering. He formulated the Markov Decision Process (MDP) and contributed to the architecture utilized in the learned controller.
+\end{IEEEbiography}
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{placeholder_a1.png}}]{Rajeswara Rao K V S}
+is the Head of the Department of Industrial Engineering \& Management at RV College of Engineering, Bengaluru, India. His research interests span industrial systems, process optimization, and the integration of artificial intelligence in engineering applications. He provided critical leadership, theoretical guidance, and project oversight for the adaptive edge inference system. ORCID: https://orcid.org/0000-0003-1592-5578.
 \end{IEEEbiography}
 
 \EOD

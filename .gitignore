@@ -11,3 +11,4 @@ __pycache__
 /model_accuracy/venv
 /phase_6_evaluation/yolo
 *.mp4
+/IDP Paper
