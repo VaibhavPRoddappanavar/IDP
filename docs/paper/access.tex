@@ -125,30 +125,94 @@ The system architecture is designed to decouple hardware monitoring, the decisio
 \end{figure*}
 
 \subsection{Hardware Abstraction and Telemetry Layer}
-At the foundation of the system lies the Hardware Abstraction Layer (HAL). Utilizing Python libraries such as \texttt{psutil} and \texttt{pynvml}, this layer continuously samples the physical state of the host device. 
 
-The monitored metrics include:
-\begin{itemize}
-    \item \textbf{GPU Utilization ($U_{gpu}$):} The percentage of time over the past sample period during which kernels were executing on the GPU.
-    \item \textbf{VRAM Utilization ($U_{vram}$):} The percentage of dedicated video memory currently allocated.
-    \item \textbf{GPU Temperature ($T_{gpu}$):} The current core temperature of the GPU in degrees Celsius.
-    \item \textbf{CPU Utilization ($U_{cpu}$):} The aggregate CPU load across all cores.
-    \item \textbf{RAM Utilization ($U_{ram}$):} The percentage of system memory currently in use.
-\end{itemize}
+At the foundation of the system lies a Hardware Abstraction Layer (HAL) that
+continuously monitors the operational state of the target edge device. The
+HAL runs in a dedicated background thread, allowing telemetry to be collected
+without blocking the real-time inference loop. In this work, the proposed
+system is implemented and evaluated on a Raspberry Pi 5 as the target
+resource-constrained edge platform.
 
-Querying hardware sensors, particularly via NVML, introduces non-trivial latency. To mitigate this, the HAL operates asynchronously in a dedicated background thread, sampling sensors at 2~Hz (every 500~ms). The sampled values are written to a thread-safe shared-memory structure. The primary inference pipeline can access this telemetry data in $\mathcal{O}(1)$ time without blocking, ensuring that state monitoring does not bottleneck video processing.
+The monitored hardware metrics comprise CPU utilization ($U_{cpu}$), RAM
+utilization ($U_{ram}$), and core temperature ($T_{core}$). These are combined
+with two inference-derived metrics: the smoothed frame rate ($FPS_{avg}$) and
+per-frame latency ($L_t$). Together, these five signals form the complete
+state vector $s_t$ supplied to the adaptive controller:
 
-\subsection{The YOLOv8 Inference Pipeline}
-Core visual processing is executed by the Ultralytics YOLOv8 engine. The pipeline comprises four stages:
-1. \textbf{Frame Acquisition:} Raw RGB frames are captured from a video file or live camera stream via OpenCV.
-2. \textbf{Preprocessing:} The image is resized to a target dimension ($W \times H$), pixel values are normalized, and the resulting tensor is transferred to the GPU.
-3. \textbf{Forward Pass:} The YOLOv8n network executes to generate bounding box coordinates and class probabilities.
-4. \textbf{Post-Processing:} Non-Maximum Suppression (NMS) filters redundant overlapping detections.
+\begin{equation}
+s_t =
+[U_{cpu},\, U_{ram},\, T_{core},\, FPS_{avg},\, L_t].
+\end{equation}
 
-This pipeline is fully parameterized. For a given frame $t$, it accepts an image size parameter $imgsz_t$ and a skip directive. If the controller issues a frame skip, the preprocessing, forward pass, and post-processing steps are completely bypassed, reducing the computational cost for that specific frame to near zero.
+The HAL samples these signals asynchronously at a fixed interval of 500~ms
+(2~Hz) and stores the latest telemetry snapshot in a thread-safe in-memory
+structure. The inference pipeline can therefore access the current state
+without waiting for a telemetry update, introducing negligible monitoring
+overhead to the detection process.
 
-\subsection{The Controller Module}
-The Controller functions as the decision-making core of the system. At the beginning of each processing window, the inference pipeline provides the Controller with the current System State vector. The Controller evaluates this state using either a deterministic rule set (Heuristic mode) or a trained neural network (Learned mode). It subsequently dictates an Action, defined as an Inference Mode, for the upcoming frames. The system then applies the specified parameters for that mode. This modular design allows seamless transitions between heuristic and learning-based control strategies.
+\subsection{The Adaptive Controller}
+
+The adaptive controller serves as the decision-making component of the
+system, receiving the latest telemetry state from the Hardware Abstraction
+Layer. At each control step, the controller processes the five-dimensional
+state vector
+$s_t = [U_{cpu}, U_{ram}, T_{core}, FPS_{avg}, L_t]$
+and produces a continuous action consisting of the raw image-resolution and
+frame-skipping parameters.
+
+The learned controller is implemented as a lightweight Continuous Actor
+network with a $5 \rightarrow 128 \rightarrow 128 \rightarrow 2$ multilayer
+perceptron (MLP). ReLU activations are used in the hidden layers, while a
+Tanh activation at the output constrains the two raw action values to the
+range $[-1,1]$. These outputs are subsequently mapped to the operational
+inference parameters: the image resolution $imgsz_t$ is mapped to the range
+$[256,640]$ and constrained to multiples of 32, while the frame-skipping
+probability $p_{skip,t}$ is mapped to $[0,1]$.
+
+The controller is trained offline using reward-filtered behavioral cloning.
+During the data-collection phase, continuous actions are explored on the
+target edge platform and the resulting state-action-reward transitions are
+recorded. The highest-reward transitions are then used as demonstrations for
+training the Continuous Actor to learn a direct mapping from the observed
+hardware and inference state to an appropriate inference configuration.
+Consequently, no online learning or parameter updates are performed during
+deployment.
+
+At runtime, the resulting action pair $(imgsz_t,p_{skip,t})$ is passed to the
+inference pipeline. This allows the computational workload to be continuously
+adjusted according to the current operating state of the edge device rather
+than relying on a fixed inference configuration.
+
+\subsection{The YOLOv8n Inference Pipeline}
+
+The visual processing stage is implemented using the Ultralytics YOLOv8n
+detector. The inference pipeline receives video frames together with the
+current control parameters $(imgsz_t, p_{skip,t})$ generated by the adaptive
+controller. For frames selected for processing, the input image is resized to
+the controller-selected resolution $imgsz_t$ and passed through the YOLOv8n
+forward pass to produce object detections. The resulting predictions are
+subsequently post-processed to obtain the final bounding-box detections.
+
+The frame-skipping mechanism is probabilistic, with the controller output
+$p_{skip,t}$ defining the probability that an incoming frame is bypassed.
+Thus,
+\begin{equation}
+P(\mathrm{skip}_t) = p_{skip,t},
+\qquad
+P(\mathrm{process}_t) = 1-p_{skip,t}.
+\end{equation}
+Frames selected for skipping bypass the inference pipeline, avoiding the
+computational cost of preprocessing, forward inference, and post-processing.
+Frames selected for processing are resized according to the current
+$imgsz_t$ configuration and passed to the YOLOv8n detector.
+
+The inference pipeline also provides feedback to the adaptive controller in
+the form of the smoothed frame rate $FPS_{avg}$ and per-frame latency $L_t$.
+These inference-derived measurements are incorporated into the telemetry
+state used at the subsequent control step. The resulting closed-loop
+architecture allows the computational workload of the YOLOv8n pipeline to be
+continuously adjusted according to the current hardware and inference
+conditions rather than relying on a fixed inference configuration.
 
 \section{Methodology}
 \label{sec:methodology}
