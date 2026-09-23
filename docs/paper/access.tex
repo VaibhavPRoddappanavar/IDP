@@ -742,29 +742,49 @@ preserves accuracy under thermal adaptation.
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=0.85\textwidth]{sysparams_timeseries.png}
-    \caption{Time-series analysis of system parameters, showcasing the precise moments the learned controller triggers preemptive mode shifts to avert thermal crises.}
+    \caption{Generated system-parameter artifact associated with the planned
+    learned-policy evaluation. It is not interpreted as a hardware-in-the-loop
+    policy trace because the exported policy and corresponding run are not
+    available in the current repository.}
     \label{fig:sysparams_timeseries}
 \end{figure*}
 
-The internal behavior of the learned policy provides deeper insights into its efficacy. An analysis of the agent's action distribution reveals its proactive nature, as seen in the system parameter time-series (Fig. \ref{fig:sysparams_timeseries}). 
+The repository includes a verification script intended to inspect the learned
+policy's response to changing telemetry. The script evaluates ten simulated
+temperature states from $35^\circ$C to $95^\circ$C, derives corresponding CPU,
+FPS, and latency values, and maps the actor output to an image size and skip
+probability. This is a policy-sanity procedure, not a deployment experiment.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{rl_imgsz_distribution.png}
-    \caption{Distribution of inference modes selected by the RL agent during sustained operation.}
+    \caption{Generated distribution of adaptive image sizes. The distribution
+    is only interpretable as a final policy result after the exported policy
+    and evaluation conditions have been reproduced.}
     \label{fig:imgsz_dist}
 \end{figure}
 
-The mode distribution (Fig. \ref{fig:imgsz_dist}) highlights a strong preference for $M_1$ as a sustainable operating point, confirming the hypothesis that preemptive moderate throttling is vastly superior to reactive aggressive throttling.
+The available artifact does not establish a preference for $M_1$ or any other
+operating point. In particular, the current verification script produces
+continuous image-size and skip-probability outputs, whereas $M_0$, $M_1$, and
+$M_2$ are discrete Phase~1 characterization points. A mode preference can be
+reported only after the policy is evaluated on recorded hardware states and
+its continuous actions are summarized against those reference points.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{adaptation_curve.png}
-    \caption{Adaptation curve illustrating the RL agent's learning progression and the stabilization of the reward signal.}
+    \caption{Verification artifact generated from a simulated thermal sweep.
+    It does not represent online learning progression or measured reward
+    stabilization.}
     \label{fig:adaptation_curve}
 \end{figure}
 
-Finally, the adaptation curve (Fig. \ref{fig:adaptation_curve}) demonstrates that the agent quickly learns to avoid the severe penalties associated with thermal throttling, stabilizing its reward signal efficiently during the training phase.
+Finally, the adaptation curve is a visualization of policy outputs under a
+synthetic thermal sweep. It does not demonstrate online learning, reward
+convergence, thermal stabilization, or safe deployment behavior. Those claims
+require an exported policy, recorded hardware-state replay, and a
+hardware-in-the-loop evaluation with paired runtime metrics.
 
 \section{Discussion}
 \label{sec:discussion}
@@ -837,6 +857,17 @@ therefore necessary before making claims about mAP, F1, or precision changes.
 The same evaluation should report small-object performance separately and
 include a resolution sweep so that the safety cost of reduced input size is
 measured directly.
+
+\subsection{Interpretation of Policy-Analysis Artifacts}
+
+The policy-analysis plots document the intended verification workflow, not a
+completed learning or deployment result. The verification script varies
+synthetic temperature, CPU, FPS, and latency values and then observes the
+actor's mapped actions. This can reveal malformed outputs or action-range
+violations, but it cannot demonstrate that the policy learned thermal
+dynamics, avoids unsafe actions, or improves runtime performance. Those
+properties must be tested with the exported policy, recorded Raspberry Pi~5
+states, and paired baseline measurements before they are presented as results.
 
 \subsection{Local Adaptive Inference Versus Edge-Cloud Offloading}
 

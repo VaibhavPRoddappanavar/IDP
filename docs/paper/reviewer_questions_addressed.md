@@ -15,6 +15,22 @@ The system uses two complementary workload controls: input-resolution scaling re
 **Manuscript locations:**
 
 - Methodology, Phase 1: Action Space Definition and Controlled Adaptation
+
+## Reviewer 2, Concern 5: Safe Exploration and Policy Behavior
+
+**Reviewer question:**
+
+How is the learned policy's exploration and adaptation behavior verified without causing unsafe workload changes during real-world operation?
+
+**Answer in the revised manuscript:**
+
+The policy-analysis subsection now clarifies that `verify.py` performs only a ten-state synthetic temperature sweep. Its plot checks the mapped image-size and skip-probability outputs, but it does not demonstrate online learning, reward convergence, thermal stabilization, or safe deployment. The manuscript requires a completed exported policy, recorded Raspberry Pi 5 state replay, and hardware-in-the-loop evaluation before making those claims.
+
+**Manuscript locations:**
+
+- Experimental Results, Controller Adaptation Dynamics and Policy Analysis
+- Discussion, Interpretation of Policy-Analysis Artifacts
+- System Architecture, The Adaptive Controller
 - Experimental Results, Experimental Setup
 - Experimental Results, Baseline vs. Heuristic Performance
 - Discussion, Interpretation of Baseline and Deterministic Control Results
