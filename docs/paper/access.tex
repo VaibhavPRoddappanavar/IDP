@@ -215,39 +215,125 @@ continuously adjusted according to the current hardware and inference
 conditions rather than relying on a fixed inference configuration.
 
 \section{Methodology}
+
 \label{sec:methodology}
-The adaptive system was developed through a rigorous, multi-phase sequence. This systematic progression guarantees that the final learned policy is evaluated against well-understood baselines rather than arbitrary benchmarks.
+
+The adaptive system was developed through a rigorous, multi-phase sequence.
+This systematic progression ensures that the final learned policy is
+evaluated against well-understood baselines rather than arbitrary
+benchmarks.
 
 \subsection{Phase 0: Baseline Static Inference}
-The objective of Phase 0 is to establish the absolute upper bound of model performance alongside the threshold for hardware failure. 
 
-In this phase, the system operates as a standard static pipeline. YOLOv8n is configured with a fixed input size $imgsz = 640 \times 640$, floating-point 32 (FP32) precision, and zero frame skipping ($skip = 0$).
+The objective of Phase 0 is to quantify the performance limitations of a
+fully static inference pipeline on the target edge hardware, providing an
+empirical baseline that motivates the need for adaptive control.
 
-During execution, a comprehensive dataset is logged containing:
-\begin{equation}
-Log_t=\{t_{stamp}, FPS_t, Latency_t, U_{gpu}, U_{cpu}, T_{gpu}, Detect\}
-\end{equation}
+In this phase, the system operates as a standard static pipeline. YOLOv8n is
+configured with a fixed input resolution of $640 \times 640$ pixels and FP32
+precision, with no frame skipping. Every incoming frame is processed
+unconditionally, resulting in a consistently high computational workload.
 
-As anticipated, sustained operation rapidly pushes the edge hardware to its thermal limits. A critical inflection point is observed when the GPU temperature crosses the manufacturer's throttling threshold (e.g., $85^\circ\mathrm{C}$). Beyond this point, the hardware intentionally downclocks to prevent damage. Consequently, processing latency spikes significantly, and the frame rate collapses. This behavior illustrates the severe performance degradation inherent in deploying static edge AI systems under uncontrolled thermal conditions.
+During execution, the system records the timestamp, frame rate, per-frame
+latency, CPU utilization, RAM utilization, core temperature, number of
+detections, average detection confidence, and cumulative frame-drop rate for
+each processed frame.
+
+On the Raspberry Pi~5 target platform, the static pipeline demonstrates
+limited real-time performance. Across the evaluation run, the achieved frame
+rate ranges from $1.8$ to $4.01$~FPS, while per-frame latency ranges from
+approximately $245$ to $665$~ms. The cumulative frame-drop rate remains high,
+ranging from $85.73\%$ to $96.88\%$ and settling at approximately $87.04\%$
+toward the end of the run. Core temperature increases from approximately
+$50^\circ$C to a maximum of $60.6^\circ$C, while RAM utilization remains
+relatively stable around $30\%$. The observed temperature range provides no
+evidence of thermal throttling during this particular run, indicating that
+the primary limitation of the static configuration is the computational
+throughput required for full-resolution YOLOv8n inference on the Raspberry
+Pi~5.
+
+The resulting behavior is illustrated in Fig.~\ref{fig:phase0_graphs}. The
+figure shows the low sustained frame rate and high inference latency, together
+with substantial frame loss throughout the run. These results demonstrate
+that a fixed $640 \times 640$ inference configuration is unsuitable for
+sustained real-time operation under the tested edge-device conditions.
+Reducing the computational workload through lower input resolution, frame
+skipping, or a combination of both therefore provides a basis for the
+adaptive inference strategy developed in the subsequent phases.
 
 \begin{figure*}[t!]
     \centering
-    \includegraphics[width=0.85\textwidth]{logs_windows_overview.png}
-    \caption{Phase 0 Baseline Performance across 5000 frames. The solid red line indicates GPU Temperature rising linearly until throttling occurs at frame 3200, causing the FPS (blue line) to crash unpredictably.}
+    \includegraphics[width=0.85\textwidth]{logs_rpi5_overview.png}
+    \caption{Phase~0 static baseline on the Raspberry Pi~5 using $640 \times
+    640$ input resolution, FP32 precision, and no frame skipping. \textit{Top}:
+    FPS and per-frame latency over the evaluation run. \textit{Middle}: CPU
+    utilization, RAM utilization, and core temperature. \textit{Bottom}:
+    detection count, average detection confidence, and cumulative frame-drop
+    rate. The static configuration exhibits low sustained frame rates,
+    substantial inference latency, and a high frame-drop rate, demonstrating
+    the limitations of fixed full-resolution inference under the resource
+    constraints of the target edge platform.}
     \label{fig:phase0_graphs}
 \end{figure*}
 
-\subsection{Phase 1: Action Space Definition and Controlled Adaptation}
-To prevent hardware failure, mechanisms must be introduced to reduce the system's workload when operating conditions become overly demanding. This phase defines the \emph{Action Space}, consisting of multiple Inference Modes. Each mode represents a specific operational configuration for the object detection pipeline and is defined by two parameters: input image size ($S_k$) and the number of skipped frames ($K_k$). 
 
-Three distinct modes are defined:
+\subsection{Phase 1: Action Space Definition and Controlled Adaptation}
+
+Phase~0 establishes that a static $640 \times 640$ pipeline imposes a
+substantial computational workload on the Raspberry Pi~5. Phase~1 therefore
+defines the controllable parameters of the inference pipeline and
+experimentally characterizes their effect on computational load and inference
+performance.
+
+The action space is based on two independent workload-control mechanisms:
+input resolution and inference frequency. The input resolution $imgsz$
+determines the spatial dimensions of the tensor presented to YOLOv8n, while
+the frame-skipping parameter controls how frequently incoming frames are
+processed.
+
+\subsubsection*{Rationale for Resolution Scaling}
+
+The computational cost of convolutional processing depends strongly on the
+spatial dimensions of the input tensor. Reducing the input resolution
+therefore provides a direct mechanism for reducing the computational workload
+without modifying the YOLOv8n model architecture or its learned parameters.
+In particular, reducing the input from $640 \times 640$ to
+$320 \times 320$ reduces the input spatial area by $75\%$, providing a
+substantial reduction in the amount of spatial computation performed by the
+network.
+
+\subsubsection*{Rationale for Frame Skipping}
+
+Resolution scaling reduces the computational cost of each processed frame,
+whereas frame skipping reduces the number of frames on which inference is
+performed. These mechanisms therefore provide complementary forms of
+workload control. For the heuristic baseline, three discrete configurations
+are defined:
+
 \begin{itemize}
-    \item $\mathcal{A}_0 \rightarrow M_0 = (640, 0)$: Highest accuracy, maximum FLOPs (no skipping, full resolution).
-    \item $\mathcal{A}_1 \rightarrow M_1 = (480, 1)$: Medium accuracy, reduces inference workload by approximately $60\%$.
-    \item $\mathcal{A}_2 \rightarrow M_2 = (320, 2)$: Lowest acceptable accuracy, reduces inference workload by approximately $85\%$.
+    \item $M_0=(640,0)$: full-resolution inference with no frame skipping.
+    \item $M_1=(480,1)$: reduced-resolution inference with every alternate
+    frame bypassed.
+    \item $M_2=(320,2)$: reduced-resolution inference with two out of every
+    three frames bypassed.
 \end{itemize}
 
-In Phase 1, feedback control is disabled, and modes are switched manually at fixed intervals (e.g., every 10 seconds). This open-loop testing characterizes how each mode influences hardware temperature, verifying that switching to $M_2$ induces rapid cooling while $M_0$ causes rapid heating. This confirms that mode switching provides sufficient thermal controllability.
+These configurations span progressively lower computational workloads and are
+used to characterize the resolution--throughput trade-off on the target
+hardware.
+
+During Phase~1, the feedback controller is disabled and each configuration is
+applied for a fixed duration. The resulting frame rate, latency, CPU
+utilization, and temperature are recorded to quantify the computational and
+thermal characteristics of each operating point. These measurements provide
+the empirical basis for the heuristic thresholds introduced in the subsequent
+phase.
+
+The discrete configurations are used only for heuristic control and
+characterization. The final learned controller instead operates over the
+continuous action parameters $(imgsz_t,p_{skip,t})$, allowing finer-grained
+adaptation than the three discrete configurations.
+
 
 \subsection{Phase 2 \& 3: The Heuristic Controller}
 With the action space established, Phase 2 integrates telemetry for real-time decision-making, and Phase 3 introduces a deterministic Heuristic Controller.
