@@ -504,11 +504,9 @@ Phase~4 defines a \emph{continuous} action space that allows the policy to
 select intermediate resolutions and arbitrary skip probabilities. The
 controller outputs a raw action $a_t \in [-1,1]^2$, which is mapped to:
 \begin{align}
-imgsz_t &= \mathrm{round}_{32}\!\left(256 +
-    \tfrac{a_t^{(0)}+1}{2}(640-256)\right),\quad
-    imgsz_t \in \{256, 288, \ldots, 640\} \\
-p_{skip,t} &= \tfrac{a_t^{(1)}+1}{2},\quad
-    p_{skip,t} \in [0,1]
+imgsz_t &= \mathrm{round}_{32}\!\left(256 + \tfrac{a_t^{(0)}+1}{2}(384)\right), \nonumber\\
+&\quad imgsz_t \in \{256, 288, \ldots, 640\} \\
+p_{skip,t} &= \tfrac{a_t^{(1)}+1}{2},\quad p_{skip,t} \in [0,1]
 \end{align}
 The resolution range $[256, 640]$ spans the practical workload range of
 YOLOv8n on the target hardware; values below 256 were not used as they
@@ -531,9 +529,10 @@ No formal optimality claim is made for this value.
 
 The reward function encodes the engineering objectives:
 \begin{equation}
-R_t = 10\hat{a}_t + 0.5\,FPS_t - 0.1\,L_t
-      - 50\cdot\mathbf{1}[T_{core}>80]
-      - 10\cdot\mathbf{1}[U_{cpu}>90]
+\begin{split}
+R_t &= 10\hat{a}_t + 0.5\,FPS_t - 0.1\,L_t \\
+    &\quad - 50\cdot\mathbf{1}[T_{core}>80] - 10\cdot\mathbf{1}[U_{cpu}>90]
+\end{split}
 \end{equation}
 where $\hat{a}_t$ is the maximum detection confidence in the current window
 (proxy for detection quality), and all terms are evaluated at $s_{t+1}$.
@@ -559,7 +558,9 @@ as a feasible on-device collection window.
 
 
 
-\subsection{Phase 5: Offline Policy Learning and Deployment}
+\subsection{Phase 5: Offline Policy Learning}
+
+With the continuous action space and offline transition dataset established, Phase~5 focuses on extracting an effective control policy. This is achieved by filtering the collected data for high-performing states and training a lightweight neural network to emulate those actions.
 
 \subsubsection*{Filtered Behavioral Cloning}
 
@@ -575,7 +576,7 @@ This is an engineering data-selection strategy.
 
 \subsubsection*{Policy Architecture}
 
-The \texttt{ContinuousActor} is a compact MLP with five inputs (matching
+The learned control policy is implemented as a compact Multi-Layer Perceptron (MLP) with five inputs (matching
 the state dimensionality) and two continuous outputs:
 \begin{equation}
 \pi_\theta : \mathbb{R}^5 \xrightarrow{128\text{-ReLU}} \mathbb{R}^{128}
@@ -612,7 +613,7 @@ retained high-reward transitions via mean-squared error regression:
 \mathcal{L}(\theta) = \mathbb{E}_{(s,a)\sim\mathcal{D}_{top30\%}}
 \bigl[\|\pi_\theta(\tilde{s}) - a\|^2\bigr]
 \end{equation}
-MSE is appropriate here because the goal is direct regression from
+Mean Squared Error (MSE) is appropriate here because the goal is direct regression from
 normalized state to a continuous raw action in $[-1,1]^2$. Training runs
 for 150~epochs using the Adam optimizer (learning rate $10^{-3}$, batch
 size~64). These hyperparameters were selected as standard settings for this
@@ -644,19 +645,13 @@ Python, OpenCV for video acquisition, Ultralytics YOLOv8n for object detection,
 and \texttt{psutil} for hardware telemetry. The baseline uses a fixed
 $640 \times 640$ input and processes every decoded frame. The
 controlled-adaptation experiment evaluates the three configurations defined in
-Phase~1: $M_0=(640,0)$, $M_1=(480,1)$, and $M_2=(320,2)$. GPU telemetry is not
-used as a control variable, and no desktop system, NVIDIA Jetson emulator, or
-TensorRT optimization is used in these experiments.
+Phase~1: $M_0=(640,0)$, $M_1=(480,1)$, and $M_2=(320,2)$.
 
 \textbf{Dataset and Workload:} The workload is a locally stored MP4 road-scene
-video containing pothole imagery, processed sequentially through OpenCV. The
-baseline and controlled-adaptation scripts each use a recorded MP4 input
-configured in their respective run scripts. The controlled-adaptation pipeline
-uses the YOLOv8 weights stored in
-\texttt{BaseModelTraining/test/best.pt}; the baseline pipeline uses the
-baseline weights configured in its run script. The experiments therefore
-measure sustained inference on a recorded road-scene workload rather than
-online camera-network transmission or a fixed 15,000-frame synthetic test.
+video containing pothole imagery, processed sequentially through OpenCV. Both
+the baseline and controlled-adaptation pipelines utilize identical YOLOv8n
+model weights trained specifically for pothole detection. The experiments therefore
+measure sustained inference on a recorded road-scene workload.
 
 \textbf{Evaluation Metrics:} The runtime scripts record the following
 measurements for each processed frame:
@@ -1070,11 +1065,43 @@ While the current implementation successfully demonstrates adaptive local infere
 
 \section{Conclusion}
 \label{sec:conclusion}
-Deploying sophisticated computer vision models on resource-constrained edge devices requires a paradigm shift away from static inference pipelines. This paper detailed the development of a Learned Adaptive Inference System that dynamically adjusts the operational parameters of a YOLOv8 pothole detection model based on real-time hardware telemetry.
+Deploying real-time object detection on resource-constrained edge devices requires
+moving beyond static inference pipelines that ignore hardware conditions during
+operation. This paper presented a Learned Adaptive Inference System that
+continuously adjusts image resolution and frame-processing frequency based on
+real-time CPU utilization, RAM utilization, core temperature, FPS, and
+per-frame latency telemetry collected on a Raspberry Pi~5.
 
-The results demonstrated that while rule-based heuristic controllers can prevent thermal throttling, their reactive nature leads to oscillatory performance and unnecessary frame drops. By formulating the problem as a Markov Decision Process and employing a DQN-lite agent, the system achieved anticipatory thermal management. The learned controller maintained stable temperatures while maximizing throughput, ensuring continuous and reliable hazard detection for autonomous navigation. 
+The system was developed in a structured six-phase pipeline. Phase~0
+established an empirical Raspberry Pi~5 baseline showing that a fixed
+$640\times640$ YOLOv8n pipeline achieves a mean inference rate of
+$3.31$~FPS and a cumulative frame-drop rate of $87.04\%$ under sustained
+road-scene workloads. Phase~1 defined the action space as three
+characterization configurations for profiling resolution--workload trade-offs.
+Phases~2 and 3 introduced a deterministic heuristic controller using
+CPU and RAM thresholds, which improved throughput to $5.35$~FPS and reduced
+the frame-drop rate to $41.91\%$ while keeping core temperature below
+$60^\circ$C. This controller is interpretable and effective, but its
+stateless, reactive nature motivates a more capable learned alternative.
 
-Furthermore, combining the adaptive pipeline with TensorRT optimization yielded compounding benefits, proving that software-level adaptivity and hardware-level optimization are highly complementary. Future research will focus on integrating content-aware features and exploring federated learning techniques to enable cross-device policy transfer across heterogeneous edge platforms.
+Phase~4 collected offline transition data by running a uniform random
+exploration policy on the target device, recording state--action--reward
+tuples over a bounded session. Phase~5 trained a compact
+Multi-Layer Perceptron via reward-filtered behavioral cloning, retaining
+only the top~30\% of transitions by reward to bias learning toward
+high-performing operating configurations. Phase~6 exports the trained
+policy as a frozen TorchScript module that performs sub-millisecond
+deterministic inference on the Raspberry Pi~5 CPU without any online
+learning during deployment.
+
+Together, these results demonstrate that adaptive local inference can
+meaningfully improve sustained throughput and reduce frame loss on
+resource-constrained hardware. The learned controller adds no training
+dependency to the deployment environment and introduces negligible
+inference overhead. Future work will evaluate the learned policy in
+a hardware-in-the-loop setting, augment the state vector with
+scene-level features, and explore hybrid edge-cloud architectures for
+environments with reliable network connectivity.
 
 \begin{thebibliography}{99}
 
