@@ -476,59 +476,161 @@ The subsequent learned controller therefore replaces these discrete rules
 with a continuous policy over $(imgsz_t,p_{skip,t})$, enabling adaptation
 across a broader range of workload conditions.
 
-\subsection{Phase 4: Formulation as a Markov Decision Process}
-To develop a predictive and optimized controller, the dynamic inference problem is formulated as a Markov Decision Process (MDP) defined by the tuple $\langle \mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma \rangle$.
+\subsection{Phase 4: MDP Formulation and Offline Data Collection}
 
-\textbf{State Space ($\mathcal{S}$):} 
-A continuous vector representing current physical telemetry and performance:
+The adaptive inference problem is formulated as a Markov Decision Process
+(MDP) $\langle \mathcal{S}, \mathcal{A}, \mathcal{R}, \mathcal{T} \rangle$.
+
+\subsubsection*{State Space}
+
+The state vector captures the five telemetry signals that most directly
+characterize the current computational and thermal operating condition of
+the Raspberry Pi~5:
 \begin{equation}
-s_t = [U_{gpu}, U_{vram}, U_{cpu}, T_{gpu}, FPS_{avg}, M_{prev}]
+s_t = [U_{cpu},\; U_{ram},\; T_{core},\; FPS_{avg},\; L_t]
 \end{equation}
+$U_{cpu}$ and $U_{ram}$ quantify the current computational load and memory
+pressure. $T_{core}$ captures the thermal state of the SoC. $FPS_{avg}$
+reflects the achieved inference throughput as observed by the pipeline, and
+$L_t$ captures per-frame inference responsiveness. Together these five signals
+provide a complete characterization of the hardware operating condition without
+requiring GPU-specific sensors unavailable on the Raspberry Pi~5.
 
-\textbf{Action Space ($\mathcal{A}$):}
-The discrete set of modes $\mathcal{A} = \{M_0, M_1, M_2\}$.
+\subsubsection*{Continuous Action Space}
 
-\textbf{Reward Function ($\mathcal{R}$):}
-The reward function encodes the engineering objectives: maximize throughput while maintaining thermal safety.
+Rather than restricting the learned controller to the three discrete
+configurations used in Phase~1 for characterization ($M_0$, $M_1$, $M_2$),
+Phase~4 defines a \emph{continuous} action space that allows the policy to
+select intermediate resolutions and arbitrary skip probabilities. The
+controller outputs a raw action $a_t \in [-1,1]^2$, which is mapped to:
+\begin{align}
+imgsz_t &= \mathrm{round}_{32}\!\left(256 +
+    \tfrac{a_t^{(0)}+1}{2}(640-256)\right),\quad
+    imgsz_t \in \{256, 288, \ldots, 640\} \\
+p_{skip,t} &= \tfrac{a_t^{(1)}+1}{2},\quad
+    p_{skip,t} \in [0,1]
+\end{align}
+The resolution range $[256, 640]$ spans the practical workload range of
+YOLOv8n on the target hardware; values below 256 were not used as they
+produced negligible detections. Multiples of 32 are required by the YOLO
+backbone's stride constraints. The continuous skip probability $p_{skip,t}$
+allows the controller to regulate inference frequency continuously rather
+than selecting from fixed skip counts. At each step, an incoming frame is
+bypassed with probability $p_{skip,t}$ and passed to YOLOv8n otherwise.
+
+\subsubsection*{Decision Interval}
+
+The policy issues a new action every 5~processed frames. This interval was
+selected as a practical engineering compromise: it provides a short but
+stable observation window for the telemetry to settle, avoids excessive
+policy updates that would add control overhead to the inference loop, and
+ensures the controller remains responsive to changing system conditions.
+No formal optimality claim is made for this value.
+
+\subsubsection*{Reward Function}
+
+The reward function encodes the engineering objectives:
 \begin{equation}
-R_t = \alpha \cdot FPS_t - \beta \cdot P_{temp}(T_{gpu}) - \delta \cdot P_{switch}(M_t, M_{prev})
+R_t = 10\hat{a}_t + 0.5\,FPS_t - 0.1\,L_t
+      - 50\cdot\mathbf{1}[T_{core}>80]
+      - 10\cdot\mathbf{1}[U_{cpu}>90]
 \end{equation}
-Where:
-- $FPS_t$ rewards the maintenance of high throughput.
-- $P_{temp}$ represents a non-linear penalty function for temperatures approaching the throttling limit.
-- $P_{switch}$ applies a minor penalty for mode switching to discourage jitter.
-- $\alpha, \beta, \delta$ are weighting hyperparameters.
+where $\hat{a}_t$ is the maximum detection confidence in the current window
+(proxy for detection quality), and all terms are evaluated at $s_{t+1}$.
+The coefficient priorities reflect the intended engineering hierarchy:
+detection quality is strongly rewarded ($\times 10$) as the primary objective;
+throughput is encouraged ($\times 0.5$) as a secondary objective; per-frame
+latency is penalized ($\times 0.1$) to discourage configurations that are
+accurate but unresponsive; a large flat penalty ($-50$) is applied when
+$T_{core} > 80^\circ$C to strongly discourage thermal overload; and a
+moderate penalty ($-10$) is applied when $U_{cpu} > 90\%$ to discourage
+CPU saturation. The coefficient values represent the selected engineering
+priorities.
 
-The temperature penalty is modeled exponentially:
+\subsubsection*{Offline Data Collection}
+
+Data collection uses a uniform random exploration policy: actions are
+sampled i.i.d.\ from $\mathrm{Uniform}(-1,1)^2$, providing broad coverage
+of the continuous action space without any bias toward previously seen
+states. The pipeline records $(s_t, a_t, R_t, s_{t+1})$ transitions for
+offline training. Collection is bounded to a practical budget of 60~minutes
+or 20,000~transitions, whichever is reached first. This budget was selected
+as a feasible on-device collection window.
+
+
+
+\subsection{Phase 5: Offline Policy Learning and Deployment}
+
+\subsubsection*{Filtered Behavioral Cloning}
+
+Phase~5 trains the learned controller entirely offline using
+\emph{reward-filtered behavioral cloning} (FBC)~\cite{b16}. The offline
+dataset is first filtered to retain only the top~30\% of transitions by
+reward---those exceeding the 70th-percentile reward threshold. This
+filtering step biases the training distribution toward actions associated
+with better observed workload–performance trade-offs, preventing the policy
+from imitating low-reward or thermally unsafe operating points. The
+retained transitions constitute the training set $\mathcal{D}_{top30\%}$.
+This is an engineering data-selection strategy.
+
+\subsubsection*{Policy Architecture}
+
+The \texttt{ContinuousActor} is a compact MLP with five inputs (matching
+the state dimensionality) and two continuous outputs:
 \begin{equation}
-P_{temp}(T) = 
-\begin{cases} 
-0 & \text{if } T \leq 65^\circ\text{C} \\
-e^{\lambda (T - 65)} - 1 & \text{if } 65^\circ\text{C} < T \leq 85^\circ\text{C} \\
-1000 & \text{if } T > 85^\circ\text{C} \text{ (Failure)}
-\end{cases}
+\pi_\theta : \mathbb{R}^5 \xrightarrow{128\text{-ReLU}} \mathbb{R}^{128}
+\xrightarrow{128\text{-ReLU}} \mathbb{R}^2 \xrightarrow{\tanh} [-1,1]^2
 \end{equation}
+The architecture is intentionally lightweight: a low-dimensional
+state-to-action mapping (5 inputs → 2 outputs) does not require deep or
+wide networks. Two hidden layers of 128 units provide sufficient nonlinear
+capacity for this low-dimensional regression task while maintaining a small
+parameter count suitable for Raspberry Pi~5 deployment. The Tanh output
+layer naturally constrains the raw action to $[-1,1]^2$, directly matching
+the action space convention used during data collection (Sec.~IV-D).
 
-In Phase 4, a massive offline dataset of state-action-reward tuples is generated by running the system using a combination of random exploration and the heuristic controller acting as a behavioral policy.
+\subsubsection*{Input Normalization}
 
-\subsection{Phase 5: Learning-Based Controller (DQN-lite)}
-With the MDP formalized and data collected, Phase 5 trains the Learning-Based Controller. Because edge devices possess limited computational resources, running a massive deep reinforcement learning agent concurrently with YOLOv8 is impractical. Therefore, a lightweight variant of the Contextual Bandit and Deep Q-Network, referred to as DQN-lite, is utilized.
-
-The agent's neural network comprises three fully connected layers (sizes 32, 32, 16) with ReLU activations. It accepts the 6-dimensional state vector $s_t$ as input and outputs a 3-dimensional vector of Q-values $Q(s_t, a; \theta)$ for each potential action.
-
-The network is trained to minimize the Temporal Difference (TD) error:
+All five state features are z-score normalized before being passed to the
+network:
 \begin{equation}
-L(\theta) = \mathbb{E} \left[ \left( R_{t+1} + \gamma \max_{a'} Q(s_{t+1}, a'; \theta^-) - Q(s_t, a_t; \theta) \right)^2 \right]
+\tilde{s}_t = (s_t - \mu_{train}) / \sigma_{train}
 \end{equation}
+where $\mu_{train}$ and $\sigma_{train}$ are the per-feature mean and
+standard deviation computed from $\mathcal{D}_{top30\%}$. Normalization
+places features with heterogeneous numerical scales ($U_{cpu}$: 0--100\%,
+$L_t$: 0--300\,ms, $T_{core}$: 30--80\,$^\circ$C, etc.) on a comparable
+numerical range, preventing large-magnitude features from dominating
+gradient updates. The normalization statistics are saved alongside the
+policy weights and applied identically at deployment time.
 
-During real-time deployment, the Controller selects the action maximizing the predicted Q-value: $a_t = \arg\max_{a} Q(s_t, a; \theta)$. The minimal size of the neural network allows a forward pass to execute in under $1$ ms on the CPU, introducing negligible latency.
+\subsubsection*{Training Objective and Hyperparameters}
 
+The policy is trained to reproduce the continuous actions of the
+retained high-reward transitions via mean-squared error regression:
+\begin{equation}
+\mathcal{L}(\theta) = \mathbb{E}_{(s,a)\sim\mathcal{D}_{top30\%}}
+\bigl[\|\pi_\theta(\tilde{s}) - a\|^2\bigr]
+\end{equation}
+MSE is appropriate here because the goal is direct regression from
+normalized state to a continuous raw action in $[-1,1]^2$. Training runs
+for 150~epochs using the Adam optimizer (learning rate $10^{-3}$, batch
+size~64). These hyperparameters were selected as standard settings for this
+scale of supervised regression.
 
+\subsection{Phase 6: Deployment and Inference}
 
-\subsection{Phase 6 \& 7: Optimization and Online Adaptation}
-Phase 6 introduces software optimizations to further enhance system efficiency. The YOLOv8 model is configured to operate with FP16 precision using NVIDIA TensorRT. TensorRT performs layer fusion and automatic kernel tuning optimized for the target graphics card. This significantly reduces the thermal output of the model, enabling Mode $M_0$ to generate less heat per processed frame.
+The trained network is exported as a TorchScript module, enabling
+portable, dependency-free loading on the Raspberry Pi~5 without requiring
+a full PyTorch training environment. At deployment, a single forward pass
+of the 5→128→128→2 network completes in under~1\,ms on the Raspberry Pi~5
+CPU, imposing negligible overhead on the inference loop.
 
-Phase 7 implements online adaptation. The RL agent periodically updates its policy using a small replay buffer of recent experiences. This continuous, lightweight fine-tuning allows the controller to dynamically recalibrate its behavior in response to changes in ambient temperature or hardware degradation over time.
+\textbf{The deployed policy is fully frozen}: no gradient updates, no
+online exploration, and no parameter modifications occur during deployment.
+The system performs only deterministic forward inference using the
+pre-trained actor weights. This ensures that the deployed controller
+behavior is consistent, auditable, and free of any online learning risk.
 
 \section{Experimental Results}
 \label{sec:experiments}
@@ -667,9 +769,16 @@ Finally, the adaptation curve (Fig. \ref{fig:adaptation_curve}) demonstrates tha
 The experimental results validate the core hypothesis: edge inference must be treated as a dynamic, hardware-aware process. 
 
 \subsection{The Value of Anticipation}
-The fundamental advantage of the learning-based approach over rule-based heuristics is its capacity for anticipation. Thermal systems possess significant inertia; when a temperature sensor registers $80^\circ$C, the heatsink is already saturated, and temperatures will continue to rise even if the workload is immediately reduced. A rule-based system reacts only after this momentum is established, necessitating aggressive fallback measures.
-
-Conversely, the Reinforcement Learning agent internalizes the consequences of thermal momentum through its updated Q-values. It recognizes that preemptively shifting to $M_1$ yields a higher long-term reward than sustaining $M_0$ until an emergency $M_2$ shutdown is unavoidable. By anticipating delayed consequences, the learned controller avoids severe performance penalties and maintains stable operation.
+The fundamental advantage of the learned controller over the deterministic
+heuristic is its ability to anticipate resource exhaustion. Thermal systems
+possess significant inertia: when $T_{core}$ registers a high value, heat
+has already accumulated in the heatsink and temperatures will continue to
+rise even if workload is immediately reduced. The heuristic controller
+reacts only after this momentum is established. The learned policy,
+trained on transitions that capture the temporal relationship between
+current resource utilization and subsequent system state, learns to
+modulate $imgsz_t$ and $p_{skip,t}$ in a graded manner before approaching
+critical thresholds, achieving smoother throughput and lower peak temperatures.
 
 \subsection{Local Adaptive Inference Versus Edge-Cloud Offloading}
 
@@ -704,13 +813,62 @@ where local adaptation provides immediate workload control and offloading is
 invoked when network and remote-computing conditions satisfy the required
 service constraints.
 
+\subsection{Scope of Reported Latency and FPS Metrics}
+
+The FPS and latency figures reported in this work are \emph{local inference
+metrics}: they measure the time to execute a single YOLOv8n forward pass on
+the Raspberry Pi~5, including pre-processing and post-processing. They do
+not represent end-to-end system latency from frame acquisition to any
+downstream consumer. The current architecture does not include a network
+transmission path; consequently, factors such as packet transmission delay,
+network jitter, queueing latency, or remote compute scheduling are not
+modelled and are not reflected in the reported metrics. If the system were
+extended to an edge-cloud deployment, these additional latency components
+would need to be incorporated into the evaluation.
+
+\subsection{Offline Exploration and Deployment Policy}
+
+Exploratory actions are used exclusively during offline data collection
+(Phase~4). The data collection controller samples actions uniformly at random
+from $[-1,1]^2$ with no reference to system safety or operating constraints.
+This exploration is performed in a bounded offline session (60~min /
+20,000~transitions) on the target device. The trained policy deployed in
+Phase~5 is fully frozen: it performs only deterministic forward inference
+and does not perform online exploration, policy updates, or parameter
+modifications during operation. The deployed system therefore does not
+introduce any online learning-induced variability into the inference pipeline.
+
+\subsection{State Design and Future Context-Aware Extensions}
+
+The current state vector $s_t = [U_{cpu}, U_{ram}, T_{core}, FPS_{avg},
+L_t]$ was designed to characterize the computational and thermal operating
+condition of the hardware. It does not include scene-level variables such
+as vehicle speed, optical flow magnitude, or visual scene complexity.
+Including such variables could in principle enable context-aware adaptation:
+for example, reducing inference frequency when visual scene dynamics are low.
+This is a meaningful direction for future work but is not implemented in the
+current system. The current application scope is passive road-surface and
+infrastructure condition monitoring rather than safety-critical autonomous
+vehicle control; no safety guarantees from the adaptive controller are
+claimed or implied.
+
+\subsection{Reward Coefficient Selection and Sensitivity}
+
+The reward coefficients ($10, 0.5, 0.1, -50, -10$) were selected to
+reflect the intended engineering hierarchy: detection quality as the primary
+objective, throughput as a secondary objective, latency penalized, and
+thermal/CPU overload conditions strongly discouraged. No formal
+hyperparameter optimization or sensitivity analysis of the reward
+coefficients was conducted. The selected values represent engineering
+design decisions. A systematic sensitivity analysis of reward coefficient
+choices and their effect on learned policy behavior is identified as future
+work.
+
 \subsection{Generalization to Other Models}
-While this study utilized YOLOv8n, the Learned Adaptive Inference System is inherently model-agnostic. The defined Action Space modulates universal pipeline parameters—input resolution and frame-skip intervals—rather than internal model weights. Consequently, the controller can be seamlessly integrated with ResNet classification pipelines, Mask R-CNN segmentation models, or transformer-based architectures, provided the Action Space is reprofiled for the specific model's computational cost.
+While this study utilized YOLOv8n, the Learned Adaptive Inference System is inherently model-agnostic. The defined action space modulates universal pipeline parameters---input resolution and frame-skip probability---rather than internal model weights. Consequently, the controller can be integrated with other detection or classification architectures, provided the action space is reprofiled for the target model's computational cost curve.
 
-\subsection{Limitations}
-A primary limitation of the current implementation is that the Action Space does not account for the visual complexity or context of the video stream. For instance, if a vehicle is stationary at a traffic light, dropping 90\% of frames would have negligible impact on hazard tracking while saving substantial power. 
-
-Future iterations could incorporate content-aware metrics, such as "scene entropy" or "optical flow magnitude," into the state vector. This would enable the controller to modulate workloads based on visual scene dynamics in addition to hardware constraints, further optimizing power efficiency during idle periods.
+\subsection{Future Research Directions}
+While the current implementation successfully demonstrates adaptive local inference, it opens several promising avenues for future exploration. First, augmenting the state vector with scene-level or visual-context features could enable content-aware adaptation, adjusting workloads dynamically based on visual scene dynamics. Second, conducting a systematic sensitivity analysis of the reward coefficients and investigating the data collection bounds across diverse operational environments present valuable opportunities to further refine policy robustness. Finally, while the current metrics focus on local inference, extending this framework into a hybrid edge-cloud architecture will allow future work to model and incorporate network transmission delays and end-to-end system latency.
 
 \section{Conclusion}
 \label{sec:conclusion}
