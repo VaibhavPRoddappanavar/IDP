@@ -577,9 +577,33 @@ pipeline; they are not treated as measurements of the runtime setup described
 here.
 
 \subsection{Baseline vs. Heuristic Performance}
-The Static Baseline performed poorly under sustained load. The system could not complete the 15,000-frame sequence without severe thermal throttling. By frame 3,500, the GPU temperature reached $85^\circ$C, prompting the hardware to throttle. Consequently, the frame rate plummeted from a stable 45 FPS to an erratic 12–25 FPS. Such instability renders the static approach unsuitable for time-critical downstream tasks like vehicle tracking or hazard avoidance.
+The static baseline was evaluated on the Raspberry Pi~5 with a fixed
+$640 \times 640$ input and no intentional frame skipping. Across the recorded
+run, the baseline log contains 692 inference rows, with a mean inference rate
+of $3.31$~FPS and mean latency of $301.80$~ms. The logged core temperature
+ranged from $49.6^\circ$C to $60.6^\circ$C, while the final cumulative frame
+drop rate was $87.04\%$. These measurements show that the main limitation of
+the tested static configuration was insufficient processing throughput rather
+than an observed thermal-throttle event.
 
-The Heuristic Controller successfully prevented thermal throttling by switching to Mode $M_2$ whenever the temperature approached $85^\circ$C. However, this abrupt transition caused significant drops in both detection quality and frame rate. The system exhibited "seesaw" behavior: heating rapidly in $M_0$ and cooling sharply in $M_2$. Both the Static Baseline and the Heuristic Controller exhibited problematic variance in frame rates and temperatures.
+The deterministic controller was evaluated in a separate Raspberry Pi~5 run
+using the CPU- and RAM-based rules described in Phase~2 and Phase~3. Across
+402 logged inference rows, it achieved a mean inference rate of $5.35$~FPS
+and mean latency of $194.60$~ms. The final frame-drop rate decreased to
+$41.91\%$, and the measured core temperature remained between $51.2^\circ$C
+and $60.0^\circ$C. The controller switched between $M_0$ and $M_1$ 86 times
+in this run; $M_2$ was not selected in the recorded Raspberry Pi log.
+
+The comparison indicates that workload adaptation improved effective
+processing throughput and reduced frame loss under the tested conditions.
+However, the deterministic controller remains reactive and stateless: each
+decision is made from the current CPU and RAM measurements, without a model of
+future thermal or workload trends. This makes it interpretable and easy to
+audit, but can also cause repeated mode changes and motivates the learned
+controller developed in the subsequent phases. Because the baseline and
+controller measurements come from separate recorded runs, the values are
+interpreted as runtime characterization rather than a paired statistical
+comparison.
 
 \subsection{Learning-Based Controller Performance}
 The Contextual Bandit / DQN-lite controller in Phase 5 demonstrated vastly superior performance. The agent learned the thermal momentum of the device and proactively switched to Mode $M_1$ before temperatures reached critical levels. This anticipatory action maintained a stable GPU temperature plateau between $76^\circ$C and $78^\circ$C.
@@ -698,6 +722,24 @@ The experimental results validate the core hypothesis: edge inference must be tr
 The fundamental advantage of the learning-based approach over rule-based heuristics is its capacity for anticipation. Thermal systems possess significant inertia; when a temperature sensor registers $80^\circ$C, the heatsink is already saturated, and temperatures will continue to rise even if the workload is immediately reduced. A rule-based system reacts only after this momentum is established, necessitating aggressive fallback measures.
 
 Conversely, the Reinforcement Learning agent internalizes the consequences of thermal momentum through its updated Q-values. It recognizes that preemptively shifting to $M_1$ yields a higher long-term reward than sustaining $M_0$ until an emergency $M_2$ shutdown is unavoidable. By anticipating delayed consequences, the learned controller avoids severe performance penalties and maintains stable operation.
+
+\subsection{Interpretation of Baseline and Deterministic Control Results}
+
+The baseline and deterministic-controller measurements justify the use of
+adaptive workload control at the application layer. The fixed $640 \times 640$
+pipeline processed frames slowly and discarded most source frames because each
+frame required a substantial inference time. The deterministic controller
+reduced this mismatch by selecting lower-workload configurations when resource
+utilization increased, improving the measured throughput and reducing the
+frame-drop rate while keeping the observed core temperature below $60^\circ$C.
+
+These results should not be interpreted as evidence that the controller
+eliminates all frame loss or guarantees hard real-time behavior. The remaining
+frame drops and repeated mode changes demonstrate the limitation of a
+stateless, threshold-based policy. This limitation provides the engineering
+justification for the later learned controller, whose objective is to select
+workload parameters using the longer-term consequences represented in the
+state--action--reward data.
 
 \subsection{Local Adaptive Inference Versus Edge-Cloud Offloading}
 

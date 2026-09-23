@@ -19,6 +19,7 @@
 | 12 | Methodology — remaining changes by Vaibhav | **Reserved** | | | Reserved for Vaibhav |
 | 13 | Methodology — remaining changes by Vaibhav | **Reserved** | | | Reserved for Vaibhav |
 | 14 | V.A Experimental Setup | Corrected the experimental setup to match the implemented experiments | Replaced the unsupported Jetson-emulation, GPU-throttling, 15,000-frame, and TensorRT claims with the actual Raspberry Pi 5, Python/Ultralytics/OpenCV/psutil pipeline, recorded MP4 workload, tested $M_0/M_1/M_2$ configurations, and logged runtime metrics. Clarified that the runtime logs do not directly measure mAP because they contain no ground-truth annotations. | Aligns Section V.A with the Phase 0 and Phase 1 scripts and available Raspberry Pi logs. | Change made by us |
+| 15 | V. Experimental Results — Baseline vs. Heuristic Performance; VII. Discussion | Replaced simulated comparison with measured Raspberry Pi results and documented reviewer coverage | Replaced unsupported GPU-throttling and 15,000-frame claims with statistics from the Phase 0 baseline and Phase 2/3 deterministic-controller logs. Added the runtime trade-off interpretation to the Discussion and recorded the corresponding reviewer questions and answers in `reviewer_questions_addressed.md`. | Aligns the comparison with the implemented controllers and documents the justification for adaptive workload control. | Change made by us |
 
 ---
 
