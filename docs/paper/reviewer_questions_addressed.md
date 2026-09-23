@@ -50,3 +50,36 @@ The system is scoped to passive road-surface monitoring and infrastructure-condi
 - Related Work, Reinforcement Learning and Edge-Cloud Resource Optimization
 - Discussion, Local Adaptive Inference Versus Edge-Cloud Offloading
 - Discussion, Interpretation of Baseline and Deterministic Control Results
+
+## Reviewer 2, Concern 3: Safe Exploration and Vehicle-Speed State
+
+**Reviewer question:**
+
+How is exploration performed safely without triggering unsafe workload changes during deployment, and why are vehicle speed or visual context absent from the state vector?
+
+**Answer in the revised manuscript:**
+
+The revised Learning-Based Controller section clarifies that the available implementation performs offline reward-filtered behavioral cloning rather than online exploration or online parameter updates during inference. This prevents random exploratory actions from being introduced into deployment. The revised Discussion also identifies the missing hardware-in-the-loop evaluation as a limitation and states that vehicle speed, visual context, and optical-flow information are not currently included in the state. These variables should be incorporated in a future safety-aware evaluation before claims about vehicle-speed-dependent frame skipping are made.
+
+**Manuscript locations:**
+
+- System Architecture, The Adaptive Controller
+- Experimental Results, Learning-Based Controller Performance
+- Discussion, Interpretation of Offline Controller Development
+- Discussion, Limitations
+
+## Reviewer 2, Concern 4: Python Runtime and Lower-Level Implementation
+
+**Reviewer question:**
+
+How does the Python implementation affect latency, and why was a lower-level C++/TensorRT implementation not used?
+
+**Answer in the revised manuscript:**
+
+The current results separate the Python Raspberry Pi runtime measurements from the offline policy-development artifacts. The baseline and deterministic-controller logs report measured inference latency, while TensorRT is no longer presented as an evaluated improvement because no corresponding Raspberry Pi result is available. The architecture and implementation discussion explains that telemetry collection is asynchronous and low frequency, but a rigorous Python-versus-C++ latency comparison remains future work.
+
+**Manuscript locations:**
+
+- System Architecture, Hardware Abstraction and Telemetry Layer
+- Experimental Results, Experimental Setup
+- Experimental Results, Impact of TensorRT Optimization
