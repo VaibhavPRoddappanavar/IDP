@@ -98,4 +98,20 @@ The cross-platform subsection is now presented as runtime and portability charac
 
 - Experimental Results, System Performance Evaluation Across Platforms
 - Discussion, Interpretation of Cross-Platform Measurements
+
+## Reviewer 2, Concern 4: Small-Object Accuracy Under Resolution Scaling
+
+**Reviewer question:**
+
+Because potholes are predominantly small objects, what is the specific small-object accuracy across the different inference modes, especially after reducing the input from 640x640 to 320x320?
+
+**Answer in the revised manuscript:**
+
+The revised manuscript now identifies this as an unresolved evaluation requirement rather than reporting unsupported values. The repository contains an accuracy script for 51 labeled images with IoU-based matching, but the adaptive policy file is missing, the adaptive telemetry is simulated, and the generated image and text reports disagree. The manuscript therefore does not claim final mAP, F1, or small-object performance. A reproducible evaluation must report small-object metrics separately and sweep the relevant resolutions, including 640, 480, 320, 240, and 160 pixels where supported.
+
+**Manuscript locations:**
+
+- Experimental Results, Model Accuracy and Fidelity Trade-offs
+- Discussion, Interpretation of Accuracy Artifacts
+- Methodology, Phase 1: Action Space Definition and Controlled Adaptation
 - Experimental Results, Impact of TensorRT Optimization

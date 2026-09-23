@@ -691,11 +691,21 @@ frontier or a statistically validated cross-platform advantage.
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=0.85\textwidth]{accuracy_comparison_bar.png}
-    \caption{Bar chart comparing detection accuracy across different inference modes (M0, M1, M2).}
+    \caption{Generated accuracy-comparison artifact for the labeled-image
+    evaluation pipeline. The artifact is retained for traceability but is not
+    used as a definitive deployed-policy result because the corresponding
+    policy and runtime conditions are not reproducible in the current
+    repository.}
     \label{fig:accuracy_comparison}
 \end{figure*}
 
-A critical concern in dynamic inference is the potential loss of detection fidelity when operating in degraded modes. The impact of resolution scaling on the YOLOv8n model's accuracy was thoroughly quantified.
+A critical concern in dynamic inference is the potential loss of detection
+fidelity when operating in degraded modes, particularly for small potholes.
+The repository contains an accuracy-evaluation script that is designed to
+compare a fixed $640 \times 640$ baseline with an adaptive image size on 51
+labeled images using an IoU threshold of 0.5. It computes precision, recall,
+F1-score, and a mean precision-based mAP@0.5 proxy from polygon or bounding-box
+matches.
 
 \begin{figure}[H]
     \centering
@@ -704,7 +714,14 @@ A critical concern in dynamic inference is the potential loss of detection fidel
     \label{fig:f1_scatter}
 \end{figure}
 
-The experimental data indicates that transitioning from $640 \times 640$ ($M_0$) to $480 \times 480$ ($M_1$) incurs a negligible drop in Mean Average Precision (mAP), typically around 2-3\%. However, dropping to $320 \times 320$ ($M_2$) results in a more pronounced degradation, as visualized in the per-image F1 scores (Fig. \ref{fig:f1_scatter}). 
+The current repository does not support a definitive quantitative claim about
+the deployed adaptive policy's accuracy. The evaluation script requires the
+exported Phase~5 policy file, which is not present, and it generates adaptive
+states from a simulated three-phase telemetry schedule rather than from a
+hardware run. In addition, the checked generated summary image and the saved
+text report contain different adaptive image-size and metric values. The
+accuracy artifacts are therefore treated as intermediate outputs requiring
+reproduction, not as final experimental evidence.
 
 \begin{figure}[H]
     \centering
@@ -713,7 +730,13 @@ The experimental data indicates that transitioning from $640 \times 640$ ($M_0$)
     \label{fig:aggregate_metrics}
 \end{figure}
 
-The learning-based controller's ability to maximize time spent in $M_0$ and $M_1$, while actively avoiding $M_2$, is fundamental to its success in preserving overall system accuracy over sustained periods (Fig. \ref{fig:aggregate_metrics}).
+The available Phase~1 measurements do establish a qualitative workload--
+detection trade-off: moving from $M_0$ to lower-workload configurations reduces
+the number of detections and average confidence while improving throughput.
+However, class-level mAP for small objects, and a controlled comparison of
+$640$, $480$, $320$, $240$, and $160$ pixel inputs, have not yet been reported.
+Those measurements are required before concluding that a learned policy
+preserves accuracy under thermal adaptation.
 
 \subsection{Controller Adaptation Dynamics and Policy Analysis}
 \begin{figure*}[t!]
@@ -801,6 +824,19 @@ primary evidence for the proposed edge deployment and reports other platforms
 as portability observations. A future comparison should use the same model,
 video, inference settings, run duration, telemetry definitions, and repeated
 trials on each target device.
+
+\subsection{Interpretation of Accuracy Artifacts}
+
+The accuracy-evaluation pipeline is a useful basis for the next experiment
+because it uses labeled images and an explicit IoU matching procedure. Its
+current outputs cannot be treated as final evidence, however, because the
+adaptive policy artifact is missing, the adaptive telemetry is simulated, and
+the saved reports are inconsistent. Reproducing the evaluation with one
+versioned policy, recorded hardware states, and a fixed output report is
+therefore necessary before making claims about mAP, F1, or precision changes.
+The same evaluation should report small-object performance separately and
+include a resolution sweep so that the safety cost of reduced input size is
+measured directly.
 
 \subsection{Local Adaptive Inference Versus Edge-Cloud Offloading}
 
