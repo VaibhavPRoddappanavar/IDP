@@ -117,13 +117,45 @@ Recent energy-efficient inference research has also explored the interaction bet
 
 However, the aforementioned approaches primarily focus on hardware scheduling, frequency management, or energy optimization. The proposed system instead establishes a direct feedback loop between hardware temperature telemetry and the computer-vision inference pipeline. When the measured temperature increases, the controller reduces the computational workload by modifying inference resolution and frame-processing frequency before severe thermal throttling occurs. This application-level strategy is designed specifically for continuous video inference and aims to maintain stable detection performance while keeping the device within a safe thermal operating range.
 
-\subsection{Reinforcement Learning for System Optimization}
+\subsection{Reinforcement Learning and Edge-Cloud Resource Optimization}
 
-Reinforcement Learning (RL) has increasingly been investigated for resource management in edge-computing environments. Recent surveys have examined RL-based approaches for mobile edge computing, including resource allocation, task scheduling, and computation offloading \cite{b7}. For example, dependency-aware reinforcement learning has been used to formulate dynamic task-offloading decisions as an optimization problem involving changing edge-computing resources \cite{b9}.
+Reinforcement Learning (RL) has increasingly been investigated for resource
+management in edge-computing environments. Recent surveys have examined
+RL-based approaches for mobile edge computing, including resource allocation,
+task scheduling, and computation offloading \cite{b7}. For example,
+dependency-aware reinforcement learning has been used to formulate dynamic
+task-offloading decisions as an optimization problem involving changing
+computational and communication resources \cite{b9}.
 
-Adaptive inference has also been explored as a means of dynamically modifying the computational resources allocated to deep neural network workloads. Edge-device adaptive inference approaches demonstrate that inference behavior can be modified according to device conditions and workload requirements \cite{b18}. These studies motivate the use of feedback-driven decision-making for managing computational workloads on edge devices.
+Deterministic task-offloading approaches have also been investigated for the
+IoT-edge-cloud continuum. Aghababaiyan \emph{et al.} proposed a deterministic
+task-offloading and resource-allocation scheme that jointly considers
+communication and computing resources across IoT devices, edge servers, and
+cloud infrastructure \cite{b25}. Their approach prioritizes completing tasks
+within their deadlines rather than minimizing the execution latency of each
+individual task, thereby providing deterministic service levels under
+resource-constrained conditions. Such approaches demonstrate that
+computation can be dynamically distributed across the IoT-edge-cloud
+continuum when communication and remote computational resources are available.
 
-The present work differs in its control objective and implementation. Rather than using RL to perform task offloading or to select among multiple neural-network architectures, the proposed system uses a lightweight heuristic controller to regulate the workload of a single YOLOv8n detector. The controller observes real-time device temperature and modifies inference parameters accordingly. This avoids the training and runtime overhead associated with an RL policy while providing a deterministic response to thermal conditions, making the approach suitable for resource-constrained edge devices performing continuous real-time pothole detection.
+Adaptive inference has also been explored as a means of dynamically modifying
+the computational resources allocated to deep neural network workloads.
+Edge-device adaptive inference approaches demonstrate that inference behavior
+can be modified according to device conditions and workload requirements
+\cite{b18}. These studies motivate the use of feedback-driven decision-making
+for managing computational workloads on resource-constrained edge devices.
+
+The present work differs from task-offloading approaches in its control
+objective and deployment architecture. Rather than distributing inference
+tasks across remote computing resources or selecting among multiple neural
+network architectures, the proposed system adapts the execution parameters of
+a single YOLOv8n detector locally. Specifically, the learned controller
+adjusts the input resolution and frame-skipping probability according to
+real-time hardware and inference telemetry. This provides workload adaptation
+without requiring network connectivity or transferring inference workloads to
+external computing infrastructure. The heuristic controller is retained as an
+interpretable baseline, while the final learned controller provides
+continuous adaptation of the inference parameters.
 
 \section{System Architecture}
 \label{sec:architecture}
@@ -324,8 +356,10 @@ are defined:
 
 \begin{itemize}
     \item $M_0=(640,0)$: full-resolution inference with no frame skipping.
+    
     \item $M_1=(480,1)$: reduced-resolution inference with every alternate
     frame bypassed.
+    
     \item $M_2=(320,2)$: reduced-resolution inference with two out of every
     three frames bypassed.
 \end{itemize}
@@ -337,14 +371,65 @@ hardware.
 During Phase~1, the feedback controller is disabled and each configuration is
 applied for a fixed duration. The resulting frame rate, latency, CPU
 utilization, and temperature are recorded to quantify the computational and
-thermal characteristics of each operating point. These measurements provide
-the empirical basis for the heuristic thresholds introduced in the subsequent
-phase.
+thermal characteristics of each operating point. Detection count and average
+detection confidence are also recorded to assess the effect of workload
+reduction on detection behavior. These measurements provide the empirical
+basis for the heuristic thresholds introduced in the subsequent phase.
 
-The discrete configurations are used only for heuristic control and
-characterization. The final learned controller instead operates over the
-continuous action parameters $(imgsz_t,p_{skip,t})$, allowing finer-grained
-adaptation than the three discrete configurations.
+\subsubsection*{Phase~1 Observations and Trade-off Analysis}
+
+The experimental results demonstrate a clear trade-off between computational
+workload and detection performance, as shown in Fig.~\ref{fig:phase1_mode_summary}.
+As the operating configuration moves from $M_0$ toward the lower-workload
+configurations, the average inference throughput increases and the tail
+latency decreases. The measured average FPS increases from approximately
+$30.3$~FPS for $M_0$ to $50.2$~FPS for $M_1$ and $51.5$~FPS for $M_2$.
+Similarly, the P95 latency decreases from approximately $367$~ms for $M_0$
+to $202$~ms for $M_1$ and $147$~ms for $M_2$.
+
+However, the improvement in computational performance is accompanied by a
+reduction in the number of detections generated during the observation
+period. The average number of detections decreases from approximately
+$8.6$ for $M_0$ to $3.7$ for $M_1$ and $2.5$ for $M_2$. The average detection
+confidence also decreases moderately, from approximately $0.575$ for $M_0$
+to $0.508$ for $M_1$ and $0.485$ for $M_2$. Thus, more aggressive workload
+reduction improves throughput and latency, but also reduces the temporal
+frequency of detection and can affect detection confidence.
+
+These observations show that the three operating configurations represent
+different workload--performance trade-offs rather than uniformly improving
+operating points. In particular, $M_1$ provides a substantial throughput
+improvement over $M_0$ while maintaining a moderate reduction in detection
+confidence, whereas the transition from $M_1$ to $M_2$ provides a further
+reduction in P95 latency but only a small increase in average FPS and a
+further reduction in detection frequency. This demonstrates that selecting
+an operating point involves balancing computational efficiency against
+detection availability and performance.
+
+The results therefore motivate adaptive workload control rather than the use
+of a single fixed configuration. Under changing device conditions, a
+controller can select an appropriate operating point according to the
+current computational and inference state. The Phase~1 measurements
+therefore provide the empirical motivation for the adaptive-control stages
+that follow.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{logs_rpi5_mode_summary.pdf}
+    \caption{Phase~1 mode characterization on the Raspberry Pi~5. The
+    lower-workload configurations increase average FPS and reduce P95
+    latency, but also reduce the average number of detections and moderately
+    decrease average detection confidence.}
+    \label{fig:phase1_mode_summary}
+\end{figure}
+
+The discrete configurations are therefore used only for empirical
+characterization and as an interpretable heuristic baseline. The final
+learned controller instead operates over the continuous action parameters
+$(imgsz_t,p_{skip,t})$, allowing it to select intermediate operating points
+rather than being restricted to the three discrete configurations evaluated
+in Phase~1. The observed workload--performance trade-off provides the
+motivation for learning such a continuous adaptation policy.
 
 
 \subsection{Phase 2 \& 3: The Heuristic Controller}
@@ -574,6 +659,39 @@ The fundamental advantage of the learning-based approach over rule-based heurist
 
 Conversely, the Reinforcement Learning agent internalizes the consequences of thermal momentum through its updated Q-values. It recognizes that preemptively shifting to $M_1$ yields a higher long-term reward than sustaining $M_0$ until an emergency $M_2$ shutdown is unavoidable. By anticipating delayed consequences, the learned controller avoids severe performance penalties and maintains stable operation.
 
+\subsection{Local Adaptive Inference Versus Edge-Cloud Offloading}
+
+Edge-cloud task offloading provides an alternative mechanism for addressing
+computational limitations at resource-constrained devices. By distributing
+tasks between the local device, edge servers, and cloud infrastructure,
+offloading can provide access to additional computational resources while
+jointly considering communication and processing constraints
+\cite{b25}. This approach is particularly relevant for applications in which
+network connectivity and bounded communication latency can be reliably
+provided.
+
+The present work instead adopts a connectivity-independent architecture in
+which both inference and control remain on the edge device. This design choice
+is motivated by the deployment objective of maintaining local road-surface
+monitoring without requiring continuous communication with an external
+computing infrastructure. Offloading would introduce an additional
+communication path whose latency and availability depend on network
+conditions, in addition to the computational cost of transmitting video data
+or inference inputs. These factors are outside the scope of the current
+experimental evaluation.
+
+This distinction does not imply that edge-cloud offloading is unsuitable for
+adaptive road-monitoring systems. Rather, the two approaches address
+different deployment assumptions. The proposed method reduces computational
+demand locally through adaptive resolution and frame-processing frequency,
+whereas an IoT-edge-cloud architecture can redistribute computation when
+suitable communication and remote computational resources are available.
+Integrating the proposed local controller with deterministic task offloading
+could therefore form a complementary hybrid architecture in future work,
+where local adaptation provides immediate workload control and offloading is
+invoked when network and remote-computing conditions satisfy the required
+service constraints.
+
 \subsection{Generalization to Other Models}
 While this study utilized YOLOv8n, the Learned Adaptive Inference System is inherently model-agnostic. The defined Action Space modulates universal pipeline parameters—input resolution and frame-skip intervals—rather than internal model weights. Consequently, the controller can be seamlessly integrated with ResNet classification pipelines, Mask R-CNN segmentation models, or transformer-based architectures, provided the Action Space is reprofiled for the specific model's computational cost.
 
@@ -663,6 +781,13 @@ S. Teerapittayanon, B. McDanel, and H. T. Kung, ``BranchyNet: Fast Inference via
 
 \bibitem{b24}
 M. Mutapcic and S. Boyd, ``Cutting-Set Methods for Robust Convex Optimization with Pessimizing Oracles,'' \textit{Optimization Methods and Software}, vol. 24, no. 3, pp. 381--406, 2009.
+
+\bibitem{b25}
+K. Aghababaiyan, B. Coll-Perales, and J. Gozalvez,
+``Deterministic Task Offloading and Resource Allocation in the
+IoT-Edge-Cloud Continuum,'' in \textit{Proc. IEEE 101st Vehicular
+Technology Conference (VTC2025-Spring)}, 2025, pp. 1--6,
+doi: 10.1109/VTC2025-Spring65109.2025.11174312.
 
 \end{thebibliography}
 
