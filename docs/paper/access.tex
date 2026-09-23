@@ -637,86 +637,177 @@ behavior is consistent, auditable, and free of any online learning risk.
 Comprehensive evaluations were conducted to validate the efficacy of the Learned Adaptive Inference System against static and heuristic baselines.
 
 \subsection{Experimental Setup}
-\textbf{Hardware Setup:} Experiments were conducted on a computer system emulating the profile of an NVIDIA Jetson Xavier NX or T4 device, equipped with 8GB of unified memory. The system experiences hardware-enforced thermal throttling at $85^\circ$C.
+\textbf{Hardware and Software:} All experiments reported in the baseline and
+controlled-adaptation stages were conducted on a Raspberry Pi~5, the target
+resource-constrained edge platform of this study. The inference pipeline uses
+Python, OpenCV for video acquisition, Ultralytics YOLOv8n for object detection,
+and \texttt{psutil} for hardware telemetry. The baseline uses a fixed
+$640 \times 640$ input and processes every decoded frame. The
+controlled-adaptation experiment evaluates the three configurations defined in
+Phase~1: $M_0=(640,0)$, $M_1=(480,1)$, and $M_2=(320,2)$. GPU telemetry is not
+used as a control variable, and no desktop system, NVIDIA Jetson emulator, or
+TensorRT optimization is used in these experiments.
 
-\textbf{Dataset and Workloads:} A high-clarity 1080p video recorded from a dashboard camera navigating urban roads was utilized. The 8-minute sequence encompasses 15,000 consecutive frames, providing sufficient duration to observe complex thermal dynamics and sustained heat accumulation.
+\textbf{Dataset and Workload:} The workload is a locally stored MP4 road-scene
+video containing pothole imagery, processed sequentially through OpenCV. The
+baseline and controlled-adaptation scripts each use a recorded MP4 input
+configured in their respective run scripts. The controlled-adaptation pipeline
+uses the YOLOv8 weights stored in
+\texttt{BaseModelTraining/test/best.pt}; the baseline pipeline uses the
+baseline weights configured in its run script. The experiments therefore
+measure sustained inference on a recorded road-scene workload rather than
+online camera-network transmission or a fixed 15,000-frame synthetic test.
 
-\textbf{Evaluation Metrics:}
+\textbf{Evaluation Metrics:} The runtime scripts record the following
+measurements for each processed frame:
 \begin{itemize}
-    \item \textbf{Mean FPS:} The average processed frames per second.
-    \item \textbf{FPS Variance ($\sigma^2$):} The stability of the frame rate.
-    \item \textbf{Max Temperature:} The peak GPU temperature recorded during the run.
-    \item \textbf{Overload Events:} The number of times the system hit the thermal throttle limit.
-    \item \textbf{Estimated mAP Drop:} The theoretical accuracy loss incurred by dropping resolution to $480p$ or $320p$ compared to the $640p$ baseline.
+    \item \textbf{Inference FPS and latency:} The smoothed inference frame rate
+    and elapsed inference latency in milliseconds.
+    \item \textbf{Resource telemetry:} CPU utilization, RAM utilization, and
+    core temperature sampled asynchronously by the system monitor.
+    \item \textbf{Detection output:} The number of detections, mean detection
+    confidence, and the maximum-confidence proxy recorded by the runtime logger.
+    \item \textbf{Frame processing:} For the controlled experiment, source
+    frames seen, processed frames, intentional skips, intentional drop rate,
+    and total frame-drop rate.
 \end{itemize}
 
-\subsection{Baseline vs. Heuristic Performance}
-The Static Baseline performed poorly under sustained load. The system could not complete the 15,000-frame sequence without severe thermal throttling. By frame 3,500, the GPU temperature reached $85^\circ$C, prompting the hardware to throttle. Consequently, the frame rate plummeted from a stable 45 FPS to an erratic 12–25 FPS. Such instability renders the static approach unsuitable for time-critical downstream tasks like vehicle tracking or hazard avoidance.
+The runtime logs do not contain ground-truth annotations and therefore do not
+directly measure mAP. Accuracy claims based on mAP or class-level validation
+are reported separately only when obtained from the dedicated evaluation
+pipeline; they are not treated as measurements of the runtime setup described
+here.
 
-The Heuristic Controller successfully prevented thermal throttling by switching to Mode $M_2$ whenever the temperature approached $85^\circ$C. However, this abrupt transition caused significant drops in both detection quality and frame rate. The system exhibited "seesaw" behavior: heating rapidly in $M_0$ and cooling sharply in $M_2$. Both the Static Baseline and the Heuristic Controller exhibited problematic variance in frame rates and temperatures.
+\subsection{Baseline vs. Heuristic Performance}
+The static baseline was evaluated on the Raspberry Pi~5 with a fixed
+$640 \times 640$ input and no intentional frame skipping. Across the recorded
+run, the baseline log contains 692 inference rows, with a mean inference rate
+of $3.31$~FPS and mean latency of $301.80$~ms. The logged core temperature
+ranged from $49.6^\circ$C to $60.6^\circ$C, while the final cumulative frame
+drop rate was $87.04\%$. These measurements show that the main limitation of
+the tested static configuration was insufficient processing throughput rather
+than an observed thermal-throttle event.
+
+The deterministic controller was evaluated in a separate Raspberry Pi~5 run
+using the CPU- and RAM-based rules described in Phase~2 and Phase~3. Across
+402 logged inference rows, it achieved a mean inference rate of $5.35$~FPS
+and mean latency of $194.60$~ms. The final frame-drop rate decreased to
+$41.91\%$, and the measured core temperature remained between $51.2^\circ$C
+and $60.0^\circ$C. The controller switched between $M_0$ and $M_1$ 86 times
+in this run; $M_2$ was not selected in the recorded Raspberry Pi log.
+
+The comparison indicates that workload adaptation improved effective
+processing throughput and reduced frame loss under the tested conditions.
+However, the deterministic controller remains reactive and stateless: each
+decision is made from the current CPU and RAM measurements, without a model of
+future thermal or workload trends. This makes it interpretable and easy to
+audit, but can also cause repeated mode changes and motivates the learned
+controller developed in the subsequent phases. Because the baseline and
+controller measurements come from separate recorded runs, the values are
+interpreted as runtime characterization rather than a paired statistical
+comparison.
 
 \subsection{Learning-Based Controller Performance}
-The Contextual Bandit / DQN-lite controller in Phase 5 demonstrated vastly superior performance. The agent learned the thermal momentum of the device and proactively switched to Mode $M_1$ before temperatures reached critical levels. This anticipatory action maintained a stable GPU temperature plateau between $76^\circ$C and $78^\circ$C.
+Phase~4 collected the offline transition data required to train the learned
+controller. The Raspberry Pi~5 collection run produced 3,033 state--action--
+reward transitions. The logged rewards ranged from $-12.72$ to $907.97$, with
+an average of $683.69$. The exploration controller sampled continuous raw
+actions in $[-1,1]^2$, which were mapped to image sizes from 256 to 640 pixels
+and skip probabilities from 0 to 1.
 
-Table \ref{tab:comparison} presents the quantitative results across the entire 15,000-frame test sequence.
+Phase~5 trains a $5 \rightarrow 128 \rightarrow 128 \rightarrow 2$
+Continuous Actor using PyTorch. The training script retains the top 30\% of
+transitions by reward, standardizes the five state variables using saved mean
+and standard-deviation arrays, and minimizes mean-squared error between the
+actor output and the selected raw actions for 150 epochs. This is an offline
+reward-filtered behavioral-cloning procedure; it is not a deployed DQN and it
+does not perform online exploration or policy updates during inference.
 
-\begin{table*}[htbp]
-\caption{Comprehensive Performance Comparison across 15,000 continuous frames (Partial Results Simulated)}
-\label{tab:comparison}
-\centering
-\begin{tabular}{@{}lccccc@{}}
-\toprule
-\textbf{System Configuration} & \textbf{Mean FPS} & \textbf{FPS Variance ($\sigma^2$)} & \textbf{Max Temp ($^\circ$C)} & \textbf{Throttle Events} & \textbf{Estimated mAP Drop} \\ \midrule
-Static YOLOv8 (M0 only) & 28.4 & 145.2 & 86.5 & 412 & 0.0\% (Reference) \\
-Static YOLOv8 (M2 only) & 85.2 & 12.1 & 64.2 & 0 & -14.5\% \\
-Heuristic Controller (Ph 3) & 41.6 & 88.5 & 80.5 & 0 & -4.2\% (Time-weighted) \\
-\textbf{Learned Controller (Ph 5)} & \textbf{48.2} & \textbf{22.4} & \textbf{78.1} & \textbf{0} & \textbf{-3.8\% (Time-weighted)} \\ 
-Learned Controller + TensorRT & 62.4 & 15.6 & 75.0 & 0 & -2.1\% (Time-weighted) \\ \bottomrule
-\end{tabular}
-\end{table*}
-
-The Learned Controller achieved a Mean FPS of 48.2, outperforming the Heuristic Controller's 41.6 FPS. This improvement resulted from the agent's preference for the moderate $M_1$ mode rather than resorting to the heavily penalized $M_2$ mode. Furthermore, the Learned Controller yielded an impressively low FPS Variance of $22.4$, compared to $145.2$ for the Baseline and $88.5$ for the Heuristic Controller. Temporal stability is critical for tracking algorithms like DeepSORT, which rely on consistent inter-frame intervals to accurately estimate object velocities.
+The available Phase~5 artifacts include the state-normalization arrays and a
+verification plot generated by gradually varying a simulated temperature
+state. An exported policy file and a hardware-in-the-loop evaluation run are
+not present in the current repository. Consequently, the present results
+establish that the transition dataset and offline training workflow are
+available, but do not support claims that the learned policy has achieved a
+specific FPS, temperature, frame-drop rate, or accuracy improvement over the
+deterministic controller.
 
 \subsection{Impact of TensorRT Optimization}
-Upon applying TensorRT FP16 optimizations, the pipeline's thermal efficiency improved dramatically. The Learned Controller seamlessly adapted to this altered thermal landscape. Because $M_0$ generated less heat per frame, the RL agent naturally extended its residence time in $M_0$ by approximately 60\% before switching to $M_1$. The optimized system attained an exceptional Mean FPS of 62.4 with a minimal time-weighted mAP reduction of just $2.1\%$.
+TensorRT FP16 optimization is described as a possible deployment optimization,
+but it is not part of the Raspberry Pi~5 baseline, controlled-adaptation, or
+offline-controller results reported in this manuscript. Accordingly, no
+TensorRT FPS, thermal, or accuracy improvement is claimed here. A controlled
+comparison of the learned policy with and without an appropriate inference
+backend remains future work.
 
 \subsection{System Performance Evaluation Across Platforms}
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=0.85\textwidth]{runs_comparison_summary.png}
-    \caption{Summary of runtime comparisons highlighting performance stability across different evaluation runs.}
+    \caption{Summary of runtime measurements collected from the available
+    static and deterministic-controller runs on the evaluated platforms.}
     \label{fig:runs_comparison}
 \end{figure*}
 
-To ensure the robustness of the adaptive framework, the system's performance was evaluated across varying hardware profiles. A comprehensive comparison of key system parameters—including GPU utilization, CPU load, and thermal stability—was conducted.
+To characterize the portability of the runtime pipeline, measurements were
+collected on Raspberry Pi~5, Windows, and macOS runs. These runs were not
+performed under identical hardware, operating-system, or thermal conditions;
+therefore, they are reported as platform-specific runtime observations rather
+than as a controlled ranking of the platforms. The available logs contain CPU
+and RAM utilization, temperature where supported, inference FPS, latency,
+detection output, and frame-processing counts.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{sysparams_bar_comparison.png}
-    \caption{Bar chart comparison of critical system parameters across static, heuristic, and learned configurations.}
+    \caption{Bar chart comparison of runtime parameters across the available
+    platform and controller runs.}
     \label{fig:sysparams_bar}
 \end{figure}
 
-As shown in Fig. \ref{fig:runs_comparison} and Fig. \ref{fig:sysparams_bar}, the learned controller demonstrated a superior ability to balance multidimensional constraints. While static pipelines maximized FPS at the expense of catastrophic thermal failure, and heuristic controllers prioritized thermal safety at the cost of erratic FPS drops, the DQN-lite agent found an optimal operating frontier. 
+The figures summarize differences in throughput, latency, and resource
+telemetry across the available runs. They do not establish that the learned
+controller is superior, because an exported learned-policy file and a
+hardware-in-the-loop learned-policy run are not currently available. In
+addition, temperature values are unavailable on some platforms when the
+operating system does not expose compatible thermal sensors. The plots are
+therefore used to document portability and measurement variation, while the
+Raspberry Pi~5 baseline and deterministic-controller results remain the main
+controlled comparison in this study.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\linewidth]{sysparams_radar.png}
-    \caption{Radar chart providing a multidimensional view of system performance metrics, including thermal safety, FPS, and resource utilization.}
+    \caption{Radar chart providing a multidimensional view of the available
+    platform measurements, including FPS, latency, and resource utilization.}
     \label{fig:sysparams_radar}
 \end{figure}
 
-The radar chart (Fig. \ref{fig:sysparams_radar}) further visualizes this balance, illustrating that the learned approach yields the most symmetrical and stable resource utilization footprint among all evaluated methods.
+The radar chart (Fig. \ref{fig:sysparams_radar}) provides a normalized visual
+summary of these measurements. Since the runs were collected under different
+conditions and do not include a completed learned-policy deployment, the
+radar chart should not be interpreted as evidence of an optimal operating
+frontier or a statistically validated cross-platform advantage.
 
 \subsection{Model Accuracy and Fidelity Trade-offs}
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=0.85\textwidth]{accuracy_comparison_bar.png}
-    \caption{Bar chart comparing detection accuracy across different inference modes (M0, M1, M2).}
+    \caption{Generated accuracy-comparison artifact for the labeled-image
+    evaluation pipeline. The artifact is retained for traceability but is not
+    used as a definitive deployed-policy result because the corresponding
+    policy and runtime conditions are not reproducible in the current
+    repository.}
     \label{fig:accuracy_comparison}
 \end{figure*}
 
-A critical concern in dynamic inference is the potential loss of detection fidelity when operating in degraded modes. The impact of resolution scaling on the YOLOv8n model's accuracy was thoroughly quantified.
+A critical concern in dynamic inference is the potential loss of detection
+fidelity when operating in degraded modes, particularly for small potholes.
+The repository contains an accuracy-evaluation script that is designed to
+compare a fixed $640 \times 640$ baseline with an adaptive image size on 51
+labeled images using an IoU threshold of 0.5. It computes precision, recall,
+F1-score, and a mean precision-based mAP@0.5 proxy from polygon or bounding-box
+matches.
 
 \begin{figure}[H]
     \centering
@@ -725,7 +816,14 @@ A critical concern in dynamic inference is the potential loss of detection fidel
     \label{fig:f1_scatter}
 \end{figure}
 
-The experimental data indicates that transitioning from $640 \times 640$ ($M_0$) to $480 \times 480$ ($M_1$) incurs a negligible drop in Mean Average Precision (mAP), typically around 2-3\%. However, dropping to $320 \times 320$ ($M_2$) results in a more pronounced degradation, as visualized in the per-image F1 scores (Fig. \ref{fig:f1_scatter}). 
+The current repository does not support a definitive quantitative claim about
+the deployed adaptive policy's accuracy. The evaluation script requires the
+exported Phase~5 policy file, which is not present, and it generates adaptive
+states from a simulated three-phase telemetry schedule rather than from a
+hardware run. In addition, the checked generated summary image and the saved
+text report contain different adaptive image-size and metric values. The
+accuracy artifacts are therefore treated as intermediate outputs requiring
+reproduction, not as final experimental evidence.
 
 \begin{figure}[H]
     \centering
@@ -734,35 +832,61 @@ The experimental data indicates that transitioning from $640 \times 640$ ($M_0$)
     \label{fig:aggregate_metrics}
 \end{figure}
 
-The learning-based controller's ability to maximize time spent in $M_0$ and $M_1$, while actively avoiding $M_2$, is fundamental to its success in preserving overall system accuracy over sustained periods (Fig. \ref{fig:aggregate_metrics}).
+The available Phase~1 measurements do establish a qualitative workload--
+detection trade-off: moving from $M_0$ to lower-workload configurations reduces
+the number of detections and average confidence while improving throughput.
+However, class-level mAP for small objects, and a controlled comparison of
+$640$, $480$, $320$, $240$, and $160$ pixel inputs, have not yet been reported.
+Those measurements are required before concluding that a learned policy
+preserves accuracy under thermal adaptation.
 
 \subsection{Controller Adaptation Dynamics and Policy Analysis}
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=0.85\textwidth]{sysparams_timeseries.png}
-    \caption{Time-series analysis of system parameters, showcasing the precise moments the learned controller triggers preemptive mode shifts to avert thermal crises.}
+    \caption{Generated system-parameter artifact associated with the planned
+    learned-policy evaluation. It is not interpreted as a hardware-in-the-loop
+    policy trace because the exported policy and corresponding run are not
+    available in the current repository.}
     \label{fig:sysparams_timeseries}
 \end{figure*}
 
-The internal behavior of the learned policy provides deeper insights into its efficacy. An analysis of the agent's action distribution reveals its proactive nature, as seen in the system parameter time-series (Fig. \ref{fig:sysparams_timeseries}). 
+The repository includes a verification script intended to inspect the learned
+policy's response to changing telemetry. The script evaluates ten simulated
+temperature states from $35^\circ$C to $95^\circ$C, derives corresponding CPU,
+FPS, and latency values, and maps the actor output to an image size and skip
+probability. This is a policy-sanity procedure, not a deployment experiment.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{rl_imgsz_distribution.png}
-    \caption{Distribution of inference modes selected by the RL agent during sustained operation.}
+    \caption{Generated distribution of adaptive image sizes. The distribution
+    is only interpretable as a final policy result after the exported policy
+    and evaluation conditions have been reproduced.}
     \label{fig:imgsz_dist}
 \end{figure}
 
-The mode distribution (Fig. \ref{fig:imgsz_dist}) highlights a strong preference for $M_1$ as a sustainable operating point, confirming the hypothesis that preemptive moderate throttling is vastly superior to reactive aggressive throttling.
+The available artifact does not establish a preference for $M_1$ or any other
+operating point. In particular, the current verification script produces
+continuous image-size and skip-probability outputs, whereas $M_0$, $M_1$, and
+$M_2$ are discrete Phase~1 characterization points. A mode preference can be
+reported only after the policy is evaluated on recorded hardware states and
+its continuous actions are summarized against those reference points.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{adaptation_curve.png}
-    \caption{Adaptation curve illustrating the RL agent's learning progression and the stabilization of the reward signal.}
+    \caption{Verification artifact generated from a simulated thermal sweep.
+    It does not represent online learning progression or measured reward
+    stabilization.}
     \label{fig:adaptation_curve}
 \end{figure}
 
-Finally, the adaptation curve (Fig. \ref{fig:adaptation_curve}) demonstrates that the agent quickly learns to avoid the severe penalties associated with thermal throttling, stabilizing its reward signal efficiently during the training phase.
+Finally, the adaptation curve is a visualization of policy outputs under a
+synthetic thermal sweep. It does not demonstrate online learning, reward
+convergence, thermal stabilization, or safe deployment behavior. Those claims
+require an exported policy, recorded hardware-state replay, and a
+hardware-in-the-loop evaluation with paired runtime metrics.
 
 \section{Discussion}
 \label{sec:discussion}
@@ -779,6 +903,80 @@ trained on transitions that capture the temporal relationship between
 current resource utilization and subsequent system state, learns to
 modulate $imgsz_t$ and $p_{skip,t}$ in a graded manner before approaching
 critical thresholds, achieving smoother throughput and lower peak temperatures.
+
+\subsection{Interpretation of Baseline and Deterministic Control Results}
+
+The baseline and deterministic-controller measurements justify the use of
+adaptive workload control at the application layer. The fixed $640 \times 640$
+pipeline processed frames slowly and discarded most source frames because each
+frame required a substantial inference time. The deterministic controller
+reduced this mismatch by selecting lower-workload configurations when resource
+utilization increased, improving the measured throughput and reducing the
+frame-drop rate while keeping the observed core temperature below $60^\circ$C.
+
+These results should not be interpreted as evidence that the controller
+eliminates all frame loss or guarantees hard real-time behavior. The remaining
+frame drops and repeated mode changes demonstrate the limitation of a
+stateless, threshold-based policy. This limitation provides the engineering
+justification for the later learned controller, whose objective is to select
+workload parameters using the longer-term consequences represented in the
+state--action--reward data.
+
+\subsection{Interpretation of Offline Controller Development}
+
+The Phase~4 and Phase~5 results establish the data and training stages of the
+learned-control pipeline, but they do not constitute an end-to-end deployment
+evaluation. The transition data provides coverage of continuous workload
+actions and their observed rewards, while reward filtering focuses training on
+actions associated with better measured operating outcomes. Because the
+available artifacts do not include a completed hardware-in-the-loop policy
+run, the learned controller should not yet be credited with the performance
+of the deterministic controller or with a measured accuracy improvement.
+
+This distinction is important for interpreting the contribution: offline
+behavioral cloning removes exploratory policy updates from deployment, but it
+does not by itself prove that the learned policy generalizes to unseen thermal
+conditions. A subsequent evaluation should load the exported policy on the
+Raspberry Pi~5, replay the same workload, and report paired FPS, latency,
+temperature, frame-drop, and detection metrics against the static and
+deterministic baselines.
+
+\subsection{Interpretation of Cross-Platform Measurements}
+
+The cross-platform plots are useful for checking whether the pipeline and its
+telemetry interfaces can be executed in different environments, but they are
+not a substitute for a controlled cross-platform experiment. Differences in
+processor, operating system, video decoding, thermal sensing, and runtime
+configuration can change the measured FPS and latency independently of the
+controller. This is why the manuscript treats the Raspberry Pi~5 runs as the
+primary evidence for the proposed edge deployment and reports other platforms
+as portability observations. A future comparison should use the same model,
+video, inference settings, run duration, telemetry definitions, and repeated
+trials on each target device.
+
+\subsection{Interpretation of Accuracy Artifacts}
+
+The accuracy-evaluation pipeline is a useful basis for the next experiment
+because it uses labeled images and an explicit IoU matching procedure. Its
+current outputs cannot be treated as final evidence, however, because the
+adaptive policy artifact is missing, the adaptive telemetry is simulated, and
+the saved reports are inconsistent. Reproducing the evaluation with one
+versioned policy, recorded hardware states, and a fixed output report is
+therefore necessary before making claims about mAP, F1, or precision changes.
+The same evaluation should report small-object performance separately and
+include a resolution sweep so that the safety cost of reduced input size is
+measured directly.
+
+\subsection{Interpretation of Policy-Analysis Artifacts}
+
+The policy-analysis plots document the intended verification workflow, not a
+completed learning or deployment result. The verification script varies
+synthetic temperature, CPU, FPS, and latency values and then observes the
+actor's mapped actions. This can reveal malformed outputs or action-range
+violations, but it cannot demonstrate that the policy learned thermal
+dynamics, avoids unsafe actions, or improves runtime performance. Those
+properties must be tested with the exported policy, recorded Raspberry Pi~5
+states, and paired baseline measurements before they are presented as results.
 
 \subsection{Local Adaptive Inference Versus Edge-Cloud Offloading}
 
