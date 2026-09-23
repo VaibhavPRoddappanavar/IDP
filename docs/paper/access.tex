@@ -535,18 +535,46 @@ Phase 7 implements online adaptation. The RL agent periodically updates its poli
 Comprehensive evaluations were conducted to validate the efficacy of the Learned Adaptive Inference System against static and heuristic baselines.
 
 \subsection{Experimental Setup}
-\textbf{Hardware Setup:} Experiments were conducted on a computer system emulating the profile of an NVIDIA Jetson Xavier NX or T4 device, equipped with 8GB of unified memory. The system experiences hardware-enforced thermal throttling at $85^\circ$C.
+\textbf{Hardware and Software:} All experiments reported in the baseline and
+controlled-adaptation stages were conducted on a Raspberry Pi~5, the target
+resource-constrained edge platform of this study. The inference pipeline uses
+Python, OpenCV for video acquisition, Ultralytics YOLOv8n for object detection,
+and \texttt{psutil} for hardware telemetry. The baseline uses a fixed
+$640 \times 640$ input and processes every decoded frame. The
+controlled-adaptation experiment evaluates the three configurations defined in
+Phase~1: $M_0=(640,0)$, $M_1=(480,1)$, and $M_2=(320,2)$. GPU telemetry is not
+used as a control variable, and no desktop system, NVIDIA Jetson emulator, or
+TensorRT optimization is used in these experiments.
 
-\textbf{Dataset and Workloads:} A high-clarity 1080p video recorded from a dashboard camera navigating urban roads was utilized. The 8-minute sequence encompasses 15,000 consecutive frames, providing sufficient duration to observe complex thermal dynamics and sustained heat accumulation.
+\textbf{Dataset and Workload:} The workload is a locally stored MP4 road-scene
+video containing pothole imagery, processed sequentially through OpenCV. The
+baseline and controlled-adaptation scripts each use a recorded MP4 input
+configured in their respective run scripts. The controlled-adaptation pipeline
+uses the YOLOv8 weights stored in
+\texttt{BaseModelTraining/test/best.pt}; the baseline pipeline uses the
+baseline weights configured in its run script. The experiments therefore
+measure sustained inference on a recorded road-scene workload rather than
+online camera-network transmission or a fixed 15,000-frame synthetic test.
 
-\textbf{Evaluation Metrics:}
+\textbf{Evaluation Metrics:} The runtime scripts record the following
+measurements for each processed frame:
 \begin{itemize}
-    \item \textbf{Mean FPS:} The average processed frames per second.
-    \item \textbf{FPS Variance ($\sigma^2$):} The stability of the frame rate.
-    \item \textbf{Max Temperature:} The peak GPU temperature recorded during the run.
-    \item \textbf{Overload Events:} The number of times the system hit the thermal throttle limit.
-    \item \textbf{Estimated mAP Drop:} The theoretical accuracy loss incurred by dropping resolution to $480p$ or $320p$ compared to the $640p$ baseline.
+    \item \textbf{Inference FPS and latency:} The smoothed inference frame rate
+    and elapsed inference latency in milliseconds.
+    \item \textbf{Resource telemetry:} CPU utilization, RAM utilization, and
+    core temperature sampled asynchronously by the system monitor.
+    \item \textbf{Detection output:} The number of detections, mean detection
+    confidence, and the maximum-confidence proxy recorded by the runtime logger.
+    \item \textbf{Frame processing:} For the controlled experiment, source
+    frames seen, processed frames, intentional skips, intentional drop rate,
+    and total frame-drop rate.
 \end{itemize}
+
+The runtime logs do not contain ground-truth annotations and therefore do not
+directly measure mAP. Accuracy claims based on mAP or class-level validation
+are reported separately only when obtained from the dedicated evaluation
+pipeline; they are not treated as measurements of the runtime setup described
+here.
 
 \subsection{Baseline vs. Heuristic Performance}
 The Static Baseline performed poorly under sustained load. The system could not complete the 15,000-frame sequence without severe thermal throttling. By frame 3,500, the GPU temperature reached $85^\circ$C, prompting the hardware to throttle. Consequently, the frame rate plummeted from a stable 45 FPS to an erratic 12–25 FPS. Such instability renders the static approach unsuitable for time-critical downstream tasks like vehicle tracking or hazard avoidance.
