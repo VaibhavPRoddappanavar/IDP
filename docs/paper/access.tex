@@ -432,37 +432,49 @@ in Phase~1. The observed workload--performance trade-off provides the
 motivation for learning such a continuous adaptation policy.
 
 
-\subsection{Phase 2 \& 3: The Heuristic Controller}
-With the action space established, Phase 2 integrates telemetry for real-time decision-making, and Phase 3 introduces a deterministic Heuristic Controller.
+\subsection{Phase 2 \& 3: Deterministic Adaptive Controller}
 
-The Heuristic Controller operates as a safety governor, employing hard-coded rules and thresholds. The logic incorporates hysteresis to prevent "flapping"—rapid, continuous switching between modes.
+Phase~2 introduces closed-loop telemetry by continuously monitoring
+$U_{cpu}$, $U_{ram}$, and $T_{core}$ during inference. Phase~3 connects
+this telemetry to a deterministic rule-based controller that selects an
+inference mode at each decision step.
 
-\begin{algorithm}
-\caption{Heuristic Control Logic}\label{alg:heuristic}
+The controller maps the current resource utilization directly to one of the
+three modes defined in Phase~1. The decision is based on CPU and RAM
+utilization as follows:
+
+\begin{algorithm}[H]
+\caption{Deterministic Adaptive Controller}
+\label{alg:heuristic}
 \begin{algorithmic}[1]
-\Require Current State $s = \{T_{gpu}, U_{gpu}\}$
-\Require Current Mode $m_{current}$
-\Ensure New Mode $m_{next}$
-\State $T_{critical} \gets 80.0$
-\State $T_{warning} \gets 70.0$
-\State $U_{high} \gets 85.0$
+\Require $U_{cpu}$, $U_{ram}$
+\Ensure $m_{next} \in \{M_0,M_1,M_2\}$
 
-\If{$s.T_{gpu} > T_{critical}$ \textbf{or} $s.U_{gpu} > 95.0$}
-    \State $m_{next} \gets M_2$ \Comment{Emergency Fallback}
-\ElsIf{$s.T_{gpu} > T_{warning}$ \textbf{or} $s.U_{gpu} > U_{high}$}
-    \State $m_{next} \gets M_1$ \Comment{Throttled Mode}
+\If{$U_{cpu}>80.0$ \textbf{or} $U_{ram}>85.0$}
+    \State $m_{next}\gets M_2$ \Comment{Severe workload reduction}
+\ElsIf{$U_{cpu}>50.0$}
+    \State $m_{next}\gets M_1$ \Comment{Moderate workload reduction}
 \Else
-    \If{$m_{current} \neq M_0$ \textbf{and} $s.T_{gpu} < (T_{warning} - 5.0)$}
-        \State $m_{next} \gets M_0$ \Comment{Safe to upgrade}
-    \Else
-        \State $m_{next} \gets m_{current}$
-    \EndIf
+    \State $m_{next}\gets M_0$ \Comment{Full-resolution inference}
 \EndIf
-\State \Return $m_{next}$
 \end{algorithmic}
 \end{algorithm}
 
-When the GPU temperature approaches $80^\circ$C, the system triggers an emergency fallback to $M_2$, drastically reducing FLOPs and allowing the hardware to cool. Once the temperature drops sufficiently, the system reverts to $M_0$. While effective at preventing crashes, this purely reactive approach leads to highly oscillatory performance, as the controller only reduces load after the system is already stressed.
+The thresholds were selected from the operating ranges observed during
+Phase~0 and Phase~1. Since sustained inference produced CPU utilization
+within approximately $45$--$90\%$, $50\%$ was used to trigger moderate
+workload reduction, while $80\%$ was selected for severe load conditions.
+The $85\%$ RAM threshold provides an additional safeguard against high
+memory utilization. The controller is stateless, with each decision made
+independently of the previous mode; consequently, no hysteresis or recovery
+timer is applied.
+
+This deterministic controller demonstrates that adaptive workload control
+can be achieved using simple and auditable rules. However, its fixed
+thresholds restrict the controller to three predefined operating points.
+The subsequent learned controller therefore replaces these discrete rules
+with a continuous policy over $(imgsz_t,p_{skip,t})$, enabling adaptation
+across a broader range of workload conditions.
 
 \subsection{Phase 4: Formulation as a Markov Decision Process}
 To develop a predictive and optimized controller, the dynamic inference problem is formulated as a Markov Decision Process (MDP) defined by the tuple $\langle \mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma \rangle$.
