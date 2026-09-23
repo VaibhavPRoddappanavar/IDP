@@ -83,3 +83,19 @@ The current results separate the Python Raspberry Pi runtime measurements from t
 - System Architecture, Hardware Abstraction and Telemetry Layer
 - Experimental Results, Experimental Setup
 - Experimental Results, Impact of TensorRT Optimization
+
+## Reviewer 2, Concern 11: Comparison With Existing Frameworks and Hardware Governors
+
+**Reviewer question:**
+
+How does the proposed controller compare with existing dynamic-inference frameworks or hardware thermal governors such as NVIDIA power profiles?
+
+**Answer in the revised manuscript:**
+
+The cross-platform subsection is now presented as runtime and portability characterization rather than as evidence of superiority over existing frameworks or hardware governors. The available experiments do not contain a completed learned-policy deployment, an NVIDIA hardware-governor comparison, or a controlled comparison against a dynamic-inference framework. These are therefore identified as evaluation gaps and future work. The revised Discussion specifies that a valid comparison must use identical workloads, model settings, telemetry definitions, run durations, and repeated trials on each target platform.
+
+**Manuscript locations:**
+
+- Experimental Results, System Performance Evaluation Across Platforms
+- Discussion, Interpretation of Cross-Platform Measurements
+- Experimental Results, Impact of TensorRT Optimization

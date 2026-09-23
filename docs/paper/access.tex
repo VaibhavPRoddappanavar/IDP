@@ -642,29 +642,50 @@ backend remains future work.
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=0.85\textwidth]{runs_comparison_summary.png}
-    \caption{Summary of runtime comparisons highlighting performance stability across different evaluation runs.}
+    \caption{Summary of runtime measurements collected from the available
+    static and deterministic-controller runs on the evaluated platforms.}
     \label{fig:runs_comparison}
 \end{figure*}
 
-To ensure the robustness of the adaptive framework, the system's performance was evaluated across varying hardware profiles. A comprehensive comparison of key system parameters—including GPU utilization, CPU load, and thermal stability—was conducted.
+To characterize the portability of the runtime pipeline, measurements were
+collected on Raspberry Pi~5, Windows, and macOS runs. These runs were not
+performed under identical hardware, operating-system, or thermal conditions;
+therefore, they are reported as platform-specific runtime observations rather
+than as a controlled ranking of the platforms. The available logs contain CPU
+and RAM utilization, temperature where supported, inference FPS, latency,
+detection output, and frame-processing counts.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{sysparams_bar_comparison.png}
-    \caption{Bar chart comparison of critical system parameters across static, heuristic, and learned configurations.}
+    \caption{Bar chart comparison of runtime parameters across the available
+    platform and controller runs.}
     \label{fig:sysparams_bar}
 \end{figure}
 
-As shown in Fig. \ref{fig:runs_comparison} and Fig. \ref{fig:sysparams_bar}, the learned controller demonstrated a superior ability to balance multidimensional constraints. While static pipelines maximized FPS at the expense of catastrophic thermal failure, and heuristic controllers prioritized thermal safety at the cost of erratic FPS drops, the DQN-lite agent found an optimal operating frontier. 
+The figures summarize differences in throughput, latency, and resource
+telemetry across the available runs. They do not establish that the learned
+controller is superior, because an exported learned-policy file and a
+hardware-in-the-loop learned-policy run are not currently available. In
+addition, temperature values are unavailable on some platforms when the
+operating system does not expose compatible thermal sensors. The plots are
+therefore used to document portability and measurement variation, while the
+Raspberry Pi~5 baseline and deterministic-controller results remain the main
+controlled comparison in this study.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\linewidth]{sysparams_radar.png}
-    \caption{Radar chart providing a multidimensional view of system performance metrics, including thermal safety, FPS, and resource utilization.}
+    \caption{Radar chart providing a multidimensional view of the available
+    platform measurements, including FPS, latency, and resource utilization.}
     \label{fig:sysparams_radar}
 \end{figure}
 
-The radar chart (Fig. \ref{fig:sysparams_radar}) further visualizes this balance, illustrating that the learned approach yields the most symmetrical and stable resource utilization footprint among all evaluated methods.
+The radar chart (Fig. \ref{fig:sysparams_radar}) provides a normalized visual
+summary of these measurements. Since the runs were collected under different
+conditions and do not include a completed learned-policy deployment, the
+radar chart should not be interpreted as evidence of an optimal operating
+frontier or a statistically validated cross-platform advantage.
 
 \subsection{Model Accuracy and Fidelity Trade-offs}
 \begin{figure*}[t!]
@@ -767,6 +788,19 @@ conditions. A subsequent evaluation should load the exported policy on the
 Raspberry Pi~5, replay the same workload, and report paired FPS, latency,
 temperature, frame-drop, and detection metrics against the static and
 deterministic baselines.
+
+\subsection{Interpretation of Cross-Platform Measurements}
+
+The cross-platform plots are useful for checking whether the pipeline and its
+telemetry interfaces can be executed in different environments, but they are
+not a substitute for a controlled cross-platform experiment. Differences in
+processor, operating system, video decoding, thermal sensing, and runtime
+configuration can change the measured FPS and latency independently of the
+controller. This is why the manuscript treats the Raspberry Pi~5 runs as the
+primary evidence for the proposed edge deployment and reports other platforms
+as portability observations. A future comparison should use the same model,
+video, inference settings, run duration, telemetry definitions, and repeated
+trials on each target device.
 
 \subsection{Local Adaptive Inference Versus Edge-Cloud Offloading}
 
