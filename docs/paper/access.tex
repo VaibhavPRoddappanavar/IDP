@@ -638,40 +638,30 @@ behavior is consistent, auditable, and free of any online learning risk.
 Comprehensive evaluations were conducted to validate the efficacy of the Learned Adaptive Inference System against static and heuristic baselines.
 
 \subsection{Experimental Setup}
-\textbf{Hardware and Software:} All experiments reported in the baseline and
-controlled-adaptation stages were conducted on a Raspberry Pi~5, the target
-resource-constrained edge platform of this study. The inference pipeline uses
-Python, OpenCV for video acquisition, Ultralytics YOLOv8n for object detection,
-and \texttt{psutil} for hardware telemetry. The baseline uses a fixed
-$640 \times 640$ input and processes every decoded frame. The
-controlled-adaptation experiment evaluates the three configurations defined in
-Phase~1: $M_0=(640,0)$, $M_1=(480,1)$, and $M_2=(320,2)$.
+\label{subsec:exp_setup}
 
-\textbf{Dataset and Workload:} The workload is a locally stored MP4 road-scene
-video containing pothole imagery, processed sequentially through OpenCV. Both
-the baseline and controlled-adaptation pipelines utilize identical YOLOv8n
-model weights trained specifically for pothole detection. The experiments therefore
-measure sustained inference on a recorded road-scene workload.
+\textbf{Hardware and System Environment:} 
+All primary runtime and baseline experiments were conducted on a physical Raspberry Pi~5 edge computer equipped with a Broadcom BCM2712 quad-core ARM Cortex-A76 processor operating at $2.4\,\text{GHz}$, $8\,\text{GB}$ of LPDDR4X RAM, and VideoCore VII GPU, running 64-bit Raspberry Pi OS (Linux kernel 6.6). The software stack comprises Python~3.10, PyTorch~2.1, OpenCV~4.8 for video frame acquisition and color conversion, Ultralytics YOLOv8 for object detection, and \texttt{psutil} for low-latency kernel telemetry acquisition. The telemetry background thread polls CPU utilization, RAM utilization, and core temperature asynchronously at $2\,\text{Hz}$ via direct reads from Linux kernel pseudo-files (\texttt{/proc/stat}, \texttt{/proc/meminfo}, and \texttt{/sys/class/thermal/thermal\_zone0/temp}), avoiding global interpreter lock (GIL) contention and keeping telemetry sampling overhead below $0.2\%$ CPU utilization.
 
-\textbf{Evaluation Metrics:} The runtime scripts record the following
-measurements for each processed frame:
+\textbf{Camera Setup, Geometry, and Video Acquisition:} 
+The real-world visual workload consists of a continuous high-definition video stream recorded from a forward-facing dashboard camera mounted centrally behind the front windshield of an inspection vehicle. The camera is positioned at a height of approximately $1.3\,\text{m}$ above the road surface with a downward pitch angle of approximately $12^\circ\text{--}15^\circ$ toward the roadway horizon. The camera features a wide-angle lens with a horizontal Field of View (FOV) of $\approx 120^\circ$, capturing the road surface spanning $5\text{--}30\,\text{m}$ ahead of the vehicle across standard lane widths. The video was captured at $1080\text{p}$ resolution ($1920 \times 1080$ pixels at $30\,\text{FPS}$, H.264 MP4 encoding) during daytime driving through urban road networks with varying asphalt conditions and natural illumination. Under typical urban driving speeds ($30\text{--}50\,\text{km/h}$), daylight auto-exposure shutter speeds ($\ge 1/500\,\text{s}$) effectively prevent severe motion blur; however, extreme high-speed motion blur and multi-camera geometry variations are designated as operational bounds and topics for future ablation studies.
+
+\textbf{Detection Model and Benchmark Datasets:} 
+The target object detector is the lightweight Ultralytics YOLOv8n (nano variant, $3.2\times 10^6$ parameters) trained specifically for road pothole detection. Model weights remain frozen during all runtime experiments. Perception accuracy is evaluated on an independent test dataset of 51 ground-truth annotated road imagery frames evaluated at an Intersection-over-Union (IoU) threshold of $0.5$ for Precision, Recall, and F1-score across candidate input resolutions. Sustained runtime throughput, frame stability, and thermal behavior are profiled over continuous video stream execution.
+
+\textbf{Adaptive Inference and Controller Configurations:} 
+The evaluation compares three paradigms: (1)~\emph{Static Baseline}: Fixed $640\times 640$ resolution processing every decoded video frame without skipping; (2)~\emph{Deterministic Heuristic Controller}: Dynamic selection among three discrete operating points ($M_0=(640,0)$, $M_1=(480,1)$, $M_2=(320,2)$) based on CPU and RAM utilization thresholds; and (3)~\emph{Learned Adaptive Inference Controller}: Continuous resolution scaling $imgsz_t \in [256, 640]$ (quantized in multiples of 32) and continuous frame-skip probability $p_{skip,t} \in [0, 1]$ generated every 5 processed frames by a frozen $5\to 128\to 128\to 2$ ContinuousActor MLP trained via offline reward-filtered behavioral cloning (retaining the top 30\% of 3,033 collected transitions). At deployment, the controller is executed as a compiled TorchScript module with forward pass latency under $1\,\text{ms}$ on the Raspberry Pi~5 CPU with zero online exploratory actions or weight updates.
+
+\textbf{Evaluation Metrics:} 
+The runtime telemetry framework records the following operational measurements per decision step:
 \begin{itemize}
-    \item \textbf{Inference FPS and latency:} The smoothed inference frame rate
-    and elapsed inference latency in milliseconds.
-    \item \textbf{Resource telemetry:} CPU utilization, RAM utilization, and
-    core temperature sampled asynchronously by the system monitor.
-    \item \textbf{Detection output:} The number of detections, mean detection
-    confidence, and the maximum-confidence proxy recorded by the runtime logger.
-    \item \textbf{Frame processing:} For the controlled experiment, source
-    frames seen, processed frames, intentional skips, intentional drop rate,
-    and total frame-drop rate.
+    \item \textbf{Throughput and Latency:} Smoothed inference frame rate (FPS) and per-frame inference latency ($L_t$ in milliseconds).
+    \item \textbf{Hardware Telemetry:} CPU utilization ($U_{cpu}$ \%), RAM utilization ($U_{ram}$ \%), and SoC core temperature ($T_{core}$ in $^\circ\text{C}$).
+    \item \textbf{Perception and Frame Processing:} Number of detected pothole instances, maximum detection confidence proxy ($\hat{a}_t$), source frames decoded, processed frames, intentional skip count, and cumulative frame-drop rate.
+    \item \textbf{Accuracy Fidelity Trade-offs:} Precision, Recall, F1-score, and mAP@0.5 proxy across downscaled input dimensions ($640\times 640$, $480\times 480$, $320\times 320$).
 \end{itemize}
 
-The runtime logs do not contain ground-truth annotations and therefore do not
-directly measure mAP. Accuracy claims based on mAP or class-level validation
-are reported separately only when obtained from the dedicated evaluation
-pipeline; they are not treated as measurements of the runtime setup described
-here.
+The runtime logs do not contain ground-truth annotations and therefore do not directly measure mAP. Accuracy claims based on mAP or class-level validation are reported separately only when obtained from the dedicated evaluation pipeline; they are not treated as measurements of the runtime setup described here.
 
 \subsection{Baseline vs. Heuristic Performance}
 The static baseline was evaluated on the Raspberry Pi~5 with a fixed

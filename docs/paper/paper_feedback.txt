@@ -1,0 +1,97 @@
+I am writing to you regarding manuscript # Access-2026-34151 entitled "A Learned Adaptive Inference System for Real-Time YOLOv8 Pothole Detection on Edge Devices" which you submitted to IEEE Access.
+
+Your article was peer reviewed with interest but has not been recommended for publication in its current form.  We strongly encourage you to address the reviewers’ concerns, which can be found at the bottom of this letter, and resubmit your article to IEEE Access once you have updated it accordingly.
+ 
+Please note that IEEE Access has a binary peer review process. Therefore, to uphold quality to IEEE standards, an article is rejected even if it requires minor edits.
+ 
+When updating your manuscript, you should elaborate on your points and clarify with references, examples, data, etc. If you disagree with any technical points the reviewers have made, please include your counterarguments in your response to the reviewers (more information detailed below) and work this into the updated manuscript. 
+
+Also, note that if a reviewer suggested references, you should only add those that are relevant to your work if you feel they strengthen your article. Recommending references to specific publications is not appropriate for reviewers and you should report excessive cases to ieeeaccessEIC@ieee.org.  Authors are not obligated to cite articles that are recommended by the reviewers, and the final decision on the article will not be influenced by whether or not authors cite these suggested references.
+ 
+IEEE Access allows one opportunity to resubmit. If the updated manuscript is determined not to have addressed all of the previous reviewers’ concerns, or if the Associate Editor still has substantial technical concerns, the article will be rejected and no further resubmissions will be allowed.
+ 
+When you are ready to resubmit your updated article, you can do so in the IEEE Author Portal.  When you log into the IEEE Author Portal you will see the title of the rejected article and the option to “Start Resubmission”.
+
+https://ieee.atyponrex.com/submission/submissionBoard/REX-PROD-2-6EC51E9E-FAFB-46E4-B5E6-4248708BE243-B6A52D9D-C72C-47ED-B635-427E0B06F60F-87906/current?idtype=external
+ 
+Upon resubmission you will be asked to upload the following 3 files:
+
+1) A document containing your response to reviewers from the previous peer review.  The “response to reviewers” document (template attached) should have the following regarding each comment: a) Reviewer’s concern, b) your response to the concern, c) your action to remedy the concern. The document should be uploaded with your manuscript files under "Author's Response Files.”
+
+2) Your updated manuscript with all your individual changes highlighted, including grammatical changes (e.g. preferably with the yellow highlight tool within the pdf file). This file should be uploaded with your manuscript files as “Highlighted PDF.”
+
+3) A clean copy of the final manuscript (without highlighted changes) submitted as a Word or LaTeX file, and as a PDF, both submitted as the “Main Manuscript.”
+
+**IMPORTANT: Please see the attached Resubmission Checklist that details all the items listed above.  Please utilize this checklist to ensure you have made the necessary edits to your manuscript, and to ensure you have all the necessary files prepared prior to resubmission.
+
+*** AUTHOR LIST CHANGES: If your revised manuscript has an updated author list, you will need to submit a formal request to the Editor by completing the attachment labelled ‘Request for Byline Change,’ and uploading it as 'Request for byline change form.' This should include a DETAILED justification explaining each author’s contribution(s) to the work. You will also need to provide the justification for the author change during the submission process.  Change in the author list is considered rare and exceptional, and the decision to allow such changes rests with the Editor. Once the list and order of authors has been established, the list and order of authors should not be altered without permission of all living authors of that article.
+
+We sincerely hope you will update your manuscript and resubmit soon. Please contact me if you have any questions.
+
+Thank you for your interest in IEEE Access.
+
+Sincerely,
+
+Dr. Sudhakar Radhakrishnan
+Associate Editor, IEEE Access
+sudha_radha2000@yahoo.co.in
+
+Reviewers' Comments to Author:
+
+Reviewer: 1
+
+Comments:
+1. There are missing references and the number of references are not sufficient for a journal publication. As a result, justification of the proposed method is poor.
+2. There should be discussion on camera placement such as camera angle, camera height and camera field of view so that the proposed method can make sense.
+3. Why are there two modes of processing? What if we process frames at 320x320 resolution all the time? Or, what if we process frames at 160x160 or 240x240 resolutions?
+4. Justify every bit of your proposed method and provide relevant references on them.
+
+Additional Questions:
+Please confirm that you have reviewed all relevant files, including supplementary files and any author response files, which can be found in the "View Author's Response" link above (author responses will only appear for resubmissions): Yes, all files have been reviewed
+
+1) Does the paper contribute to the body of knowledge?: Yes, the paper proposes a solution to thermal throttling of edge devices when they were running YOLOv8 model to detect potholes on roads. However, there are missing references on the topic.
+
+2) Is the paper technically sound?: Yes, the paper is technically sound, however, the authors should justify why they chose such a method by discussing camera angle, camera field of view, camera height relative to the road surface, and how they coped with motion blur.
+
+3) Is the subject matter presented in a comprehensive manner?: Yes, the subject matter is presented in a comprehensive manner, however, more references and justification over the design is required.
+
+4) Are the references provided applicable and sufficient?: yes.
+
+5) Are there references that are not appropriate for the topic being discussed?: No
+
+5a) If yes, then please indicate which references should be removed.:
+
+
+Reviewer: 2
+
+Comments:
+The manuscript proposes a DQN-lite based adaptive inference system to manage thermal throttling for YOLOv8 pothole detection on edge devices. The systematic progression from baseline profiling to a reinforcement learning controller is well-structured and addresses a genuine hardware constraint in embedded vision systems. However, the study suffers from critical flaws regarding its dangerous frame-skipping strategy in autonomous driving, ignorance of edge-cloud offloading paradigms, lack of stochastic latency modeling, and reliance on desktop hardware emulation rather than physical edge devices. Addressing the following major comments is necessary before the manuscript can be considered for publication.
+In Section IV.B, the system's emergency fallback (Mode 2) relies on dropping the resolution to 320x320 and skipping intermediate frames to reduce the thermal load. For an autonomous vehicle or dashboard camera traveling at highway speeds, skipping frames creates massive blind spots in perception, which is a severe safety hazard. Instead of severely degrading local detection fidelity or blindly skipping frames, modern intelligent transportation systems employ dynamic offloading mechanisms. As established in recent literature such as "Deterministic Task Offloading and Resource Allocation in the IoT-Edge-Cloud Continuum", leveraging the edge-cloud architecture allows resource-constrained edge nodes to dynamically offload heavy computational tasks to edge servers when local thermal or processing limits are reached. The authors must discuss why a deterministic task offloading paradigm was not considered as a safe fallback mechanism instead of dangerous frame skipping, and how their system could integrate with the IoT-Edge-Cloud continuum to maintain continuous high-fidelity detection under thermal stress.
+The manuscript repeatedly claims to offer a "Real-Time" inference system and uses deterministic FPS and Latency metrics (Equation 1). However, in practical autonomous systems and IoT environments, video streams generated by sensors or transmitted over vehicular networks do not arrive with perfectly deterministic intervals. They are heavily subjected to arrival-time jitter and traffic variability. As mathematically demonstrated in the study "Stochastic End-to-End Latency Modeling of the IoT-Edge-Cloud Continuum: Impact of Jitter and Traffic Variability on Deterministic Service Provisioning", ignoring stochastic temporal variabilities inevitably leads to massive queueing delays, rendering static latency calculations invalid. If the system dynamically changes processing speeds or offloads tasks, the queueing delay will fluctuate severely due to jitter. The authors must revise their deterministic latency claims and incorporate a discussion on how their DQN-lite state space and reward function account for stochastic frame arrival jitter and dynamic queueing delays in real-world deployments.
+The experimental setup in Section V.A states that testing was conducted on a computer system "emulating the profile of an NVIDIA Jetson". Thermal dynamics, ambient temperature absorption (e.g., a dashboard under direct sunlight), and physical heatsink saturation cannot be accurately emulated on a desktop PC. The authors must validate their reinforcement learning controller on physical edge hardware (e.g., an actual Jetson Orin Nano or Xavier NX) to prove the system's thermal management actually works in practice.
+The performance evaluation focuses heavily on the overall Mean Average Precision (mAP) drop. However, potholes are predominantly small-scale objects in the camera's field of view. Downscaling the input resolution from 640x640 to 320x320 (Mode M2) disproportionately destroys the network's ability to detect small objects. The authors must report the specific mAP for small objects across the different inference modes to reveal the true safety cost of thermal throttling on pothole detection.
+In Section IV.E, the Deep Q-Network (DQN-lite) is introduced. Reinforcement learning agents inherently require an exploration phase to learn optimal policies. If the agent explores randomly during a real-world driving scenario, it could intentionally trigger thermal overload or drop frames inappropriately. The authors must explain how the exploration-exploitation trade-off is managed safely during online adaptation without jeopardizing vehicle safety.
+The state space defined in Equation 2 includes hardware metrics like GPU utilization, CPU load, and temperature. However, it completely ignores the vehicle's speed. Dropping frames while a vehicle is stopped at a traffic light is perfectly safe, but dropping frames while traveling at 100 kilometers per hour is highly dangerous. The authors should justify why vehicle speed or visual frame context was excluded from the state vector.
+The system architecture (Figure 1) relies heavily on Python, ctypes, and OpenCV running in background threads. Python's Global Interpreter Lock (GIL) is known to cause stuttering and unpredictable latency spikes in multi-threaded real-time computer vision pipelines. The authors must provide a rigorous latency profiling of the Python overhead, or explain why a lower-level implementation (e.g., C++ with TensorRT native threads) was not utilized to guarantee strict real-time execution.
+The reward function (Equation 3) relies on three hyperparameters: alpha, beta, and delta. The manuscript provides no details on how these weights were selected. A sensitivity analysis is required to demonstrate how varying these arbitrary weights impacts the agent's preference for maintaining frame rates versus preventing thermal spikes.
+In Section IV.F, the authors mention using TensorRT FP16 optimizations. TensorRT natively supports "Dynamic Shapes," allowing the inference engine to accept variable input resolutions efficiently without reloading the execution context. It is unclear if the proposed system utilizes TensorRT's native dynamic resolution capabilities or if it relies on a custom, less efficient resizing wrapper. This implementation detail must be clarified.
+The comparative analysis in Section V compares the learning-based controller only against a static baseline and a simple rule-based heuristic. To prove the superiority of the DQN-lite approach, the authors should include a comparison against existing dynamic inference frameworks or built-in hardware thermal governors (like Nvidia's nvpmodel power profiles) that manage thermals at the operating system level.
+
+
+
+Additional Questions:
+Please confirm that you have reviewed all relevant files, including supplementary files and any author response files, which can be found in the "View Author's Response" link above (author responses will only appear for resubmissions): Yes, all files have been reviewed
+
+1) Does the paper contribute to the body of knowledge?: yes
+
+2) Is the paper technically sound?: yes
+
+3) Is the subject matter presented in a comprehensive manner?: yes
+
+4) Are the references provided applicable and sufficient?: yes
+
+5) Are there references that are not appropriate for the topic being discussed?: No
+
+5a) If yes, then please indicate which references should be removed.:
+
+If you have any questions, please contact article administrator: Mr. Ankit Srivastava a.srivastava@ieee.org

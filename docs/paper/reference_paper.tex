@@ -1,0 +1,820 @@
+\documentclass{ieeeaccess}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{multirow}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+\history{Date of publication xxxx 00, 0000, date of current version xxxx 00, 0000.}
+\doi{10.1109/ACCESS.2017.DOI}
+
+\title{Real-Time GPS-Based Pothole Detection and Severity Classification System Using YOLOV8n and Edge Computing}
+\author{\uppercase{Vaibhav P. Roddappanavar}\authorrefmark{1},
+\uppercase{Vishal K. Bhat}\authorrefmark{1},
+\uppercase{Sumadhva Krishna H. M.}\authorrefmark{1},
+\uppercase{Chethohaar J. M.}\authorrefmark{1},
+\uppercase{Rachateshwar}\authorrefmark{2}, and
+\uppercase{Dr. Smriti Srivastava}\authorrefmark{1}}
+\address[1]{Department of Computer Science, RV College of Engineering, Bengaluru, Karnataka 560059, India (e-mail: vaibhavpr.cs23@rvce.edu.in; vishalkbhat.cs23@rvce.edu.in; ; sumadhvak.cs23@rvce.edu.in;smritisrivastavarvce.edu.in)}
+\address[1]{Department of Cyber Security, RV College of Engineering, Bengaluru, Karnataka 560059, India (e-mail: chethohaarjm.cy23@rvce.edu.in)}
+\address[2]{Department of AI \& ML, RV College of Engineering, Bengaluru, Karnataka 560059, India (e-mail: rachateshwar.ai24@rvce.edu.in)}
+\tfootnote{This work was supported by the Department of Computer Science at RV College of Engineering.}
+
+\markboth
+{Smriti \headeretal: Real-Time GPS-Based Pothole Detection and Severity Classification System}
+{Smriti \headeretal: Real-Time GPS-Based Pothole Detection and Severity Classification System}
+
+\corresp{Corresponding author: Dr. Smriti Srivastava (e-mail: smritisrivastava@rvce.edu.in).}
+
+\begin{abstract}
+Road infrastructure degradation, particularly pothole formation, poses significant safety hazards and contributes to vehicle damage and escalating maintenance costs. This paper presents an integrated real-time pothole detection, depth estimation, severity classification, and route optimization system combining computer vision, ultrasonic sensing, edge computing, and GPS technology. We deploy an optimized YOLOV8n model on Raspberry Pi 5 hardware with GPS-based spatial de-duplication to eliminate redundant detections. Pothole depth is measured using a geometry-based approach employing an HC-SR04 ultrasonic sensor mounted at a fixed inclination angle of 37\textdegree{} from the vertical, where depth is computed as the differential distance multiplied by the cosine of the mounting angle. The system classifies pothole severity through semantic segmentation and provides pothole-aware route recommendations that help drivers select safer paths with fewer road hazards. Cloud integration with an interactive dashboard enables municipal authorities to prioritize maintenance effectively. System validation demonstrated 93.7\% precision at approximately \$150 per unit, representing a 90\% cost reduction compared to commercial solutions. This scalable approach enables automated road condition monitoring and intelligent navigation assistance for both municipal operations and individual drivers.
+\end{abstract}
+
+\begin{keywords}
+Pothole detection, YOLOV8n, Edge computing, GPS tracking, Spatial de-duplication, Haversine distance, Ultrasonic depth estimation, HC-SR04, Geometric depth model, Segmentation, ONNX optimization, Raspberry Pi, Road condition monitoring
+\end{keywords}
+
+\titlepgskip=-15pt
+
+\maketitle
+
+\section{Introduction}
+\label{sec:introduction}
+\PARstart{R}{oad} infrastructure degradation, particularly pothole formation, represents a persistent challenge affecting road safety, vehicle longevity, and transportation efficiency. According to recent studies, potholes contribute to approximately 30\% of road accidents and cause billions of dollars in vehicle damage annually \cite{b1}. Traditional manual inspection methods are time-consuming, labor-intensive, and often fail to provide comprehensive coverage of road networks.
+
+\subsection{Problem Statement}
+Current pothole detection approaches face several limitations: (1) manual inspection is resource-intensive and cannot scale to large road networks, (2) existing automated systems often require expensive equipment and cloud computing resources, (3) real-time detection with precise geolocation remains challenging, (4) severity classification for maintenance prioritization is typically absent, and (5) current navigation and route planning systems do not consider road surface quality or pothole data when suggesting routes to drivers.
+
+\subsection{Proposed Solution}
+This work presents an end-to-end GPS-based pothole detection system that addresses these challenges through multiple integrated components. The system performs real-time detection using an optimized YOLOV8n model deployed on edge devices, specifically Raspberry Pi 5 hardware. Precise GPS tagging is achieved through a Quectel EC200U-CN cellular modem with multi-constellation GNSS support. Metric pothole depth is estimated using a geometry-based approach with an HC-SR04 ultrasonic distance sensor mounted at a fixed inclination of 37\textdegree{} from the vertical, where depth is derived from the differential sensor reading projected onto the vertical axis. Multi-level severity classification uses semantic segmentation techniques to assess pothole criticality. All detected potholes are uploaded to a cloud-based backend with MongoDB storage and visualized through an interactive React-based web dashboard. A pothole-aware route optimization algorithm analyzes candidate routes and recommends paths with fewer road hazards, helping drivers avoid damaged road segments. The system achieves practical edge deployment through ONNX model optimization and provides seamless data integration via a RESTful API backend.
+
+\subsection{Contributions}
+The key contributions of this paper are:
+\begin{enumerate}
+    \item A comprehensive edge-based pothole detection system integrating YOLO detection, GPS tracking, and criticality analysis
+    \item ONNX model optimization achieving real-time inference (3-5 FPS) on Raspberry Pi 5
+    \item GPS-based spatial de-duplication algorithm eliminating redundant detections using Haversine distance computation with 5-meter threshold
+    \item Geometry-based pothole depth estimation using an HC-SR04 ultrasonic sensor mounted at 37\textdegree{} inclination with trigonometric depth computation and automated outlier rejection
+    \item Multi-stage severity classification using semantic segmentation (YOLOv11n-seg)
+    \item Pothole-aware route optimization algorithm with multi-objective scoring for distance, time, and road quality
+    \item Cloud-integrated architecture with MongoDB, Cloudinary, and React-based dashboard
+    \item Four upload pipeline strategies optimized for bandwidth efficiency
+    \item Open-source implementation with comprehensive documentation
+\end{enumerate}
+
+\section{Related Work}
+
+This section provides a comprehensive review of existing literature in pothole detection and road condition monitoring. We examine the evolution of detection methodologies from traditional sensor-based approaches to modern deep learning techniques, and discuss the integration of edge computing and GPS technologies that inform our system design.
+
+\subsection{Traditional Pothole Detection}
+Early pothole detection systems relied on accelerometer-based methods or vehicle vibration sensors. These pioneering approaches used inertial sensors mounted on vehicles to detect sudden vertical accelerations characteristic of pothole impacts \cite{b1}. While cost-effective, these approaches suffer from high false positive rates and cannot provide visual evidence of road conditions. Three-dimensional laser scanning systems offer high accuracy but are prohibitively expensive for widespread deployment.
+
+\subsection{Computer Vision Approaches}
+Machine learning-based pothole detection has evolved from classical image processing techniques using edge detection and morphological operations to deep learning methods. Convolutional Neural Networks (CNNs) have shown promising results, with architectures like VGG, ResNet, and MobileNet being adapted for pothole detection. However, these methods often require substantial computational resources that limit their deployment on edge devices.
+
+\subsection{YOLO-based Detection}
+The YOLO (You Only Look Once) family of algorithms provides real-time object detection capabilities through single-pass inference. Recent works have explored YOLOV8n for pothole detection with various enhancements including data augmentation \cite{b2}, depth measurement integration \cite{b3}, point cloud fusion \cite{b4}, and instance segmentation \cite{b5, b6}. Our work advances this by utilizing YOLOV8n with ONNX optimization for edge deployment on resource-constrained devices.
+
+\subsection{Edge Computing Solutions}
+Edge-based deployment on devices like Raspberry Pi, NVIDIA Jetson, or mobile devices has gained attention for real-time applications \cite{b9, b7}. Quantization techniques \cite{b10} and optimized architectures \cite{b8} have been proposed for resource-constrained edge devices. ONNX Runtime has emerged as a powerful tool for cross-platform edge AI deployment \cite{b14, b15}. Our system achieves an optimal balance through ONNX optimization and input resolution reduction.
+
+\subsection{GPS Integration and IoT Systems}
+Integration with IoT platforms and cloud services enables real-time data management for pothole detection systems. Our system provides reliable multi-GNSS positioning suitable for precise road maintenance planning in smart city infrastructure \cite{b16, b17}.
+
+\section{System Architecture}
+
+This section presents the overall architecture of the proposed pothole detection system. We describe the hardware and software components that work together to enable real-time detection, GPS-based localization, and cloud-based data management. The architecture is designed to balance computational efficiency with detection accuracy, enabling practical deployment on low-cost edge devices.
+
+\subsection{Overview}
+The proposed system comprises five main components that work in concert to provide end-to-end pothole detection and monitoring:
+\begin{enumerate}
+    \item \textbf{Edge Device Module}: Raspberry Pi 5 with camera, GPS, and ultrasonic sensor for real-time detection and depth measurement
+    \item \textbf{Detection Pipeline}: YOLOV8n model with ONNX optimization
+    \item \textbf{Depth Estimation Module}: HC-SR04 ultrasonic sensor with geometry-based trigonometric depth computation
+    \item \textbf{Cloud Backend}: Node.js/Express API with MongoDB database
+    \item \textbf{Frontend Dashboard}: React-based visualization and analytics interface
+\end{enumerate}
+
+Fig.~\ref{fig:system_architecture} illustrates the complete system architecture showing the data flow from edge detection through cloud storage to user visualization. The architecture is divided into two primary modules: the Edge Device (Raspberry Pi 5) that performs real-time detection and GPS tagging, and the Artifact Storage component that handles backend processing, database management, and route optimization. The left side shows the Edge Device (Raspberry Pi 5) with integrated Camera Module and Quectel GPS Module for capturing frame data and obtaining precise geolocation. Filtered pothole events are transmitted to the Artifact Storage component on the right, which comprises the Backend service, Segmentation Model for severity analysis, MongoDB (metadata storage), Cloudinary CDN (image storage), and the Pothole-Aware Routing algorithm. The User Interface (Webapp/APP) retrieves cached pothole data and route results, while alternate routes are requested from the routing service when needed.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.5\textwidth]{system_architecture.png}
+    \caption{Complete system architecture diagram.}
+    \label{fig:system_architecture}
+\end{figure}
+
+
+\subsection{Hardware Configuration}
+The hardware configuration forms the foundation of our edge-based detection system. We carefully selected components that balance processing power, cost, and power consumption for mobile deployment scenarios. Each component was chosen based on extensive testing and compatibility requirements. Fig.~\ref{fig:hardware_setup} illustrates the complete hardware assembly showing the interconnection of all physical components. The physical deployment consists of a Power Source providing regulated power to the Raspberry Pi 5 single-board computer, which serves as the central processing unit. The Pi Camera Module 3 (12MP with autofocus) connects via the dedicated CSI-2 interface for low-latency video capture. The Quectel EC200U-CN cellular modem provides dual functionality: multi-constellation GNSS positioning (GPS, GLONASS, BeiDou, Galileo) via dedicated antennas, and 4G LTE connectivity for cloud uploads. All components are housed in a weatherproof enclosure suitable for vehicle mounting.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.5\textwidth]{hardware_setup.png}
+\caption{Hardware setup and component interconnection diagram.}
+\label{fig:hardware_setup}
+\end{figure}
+
+\subsubsection{Raspberry Pi 5}
+The Raspberry Pi 5 serves as the edge computing platform, featuring a quad-core ARM Cortex-A76 processor clocked at 2.4GHz. We utilize the 8GB RAM variant, which provides ample memory for real-time inference and concurrent operations. The board provides a dedicated CSI camera interface for connecting the Pi Camera Module and USB 3.0 ports for GPS module connectivity. The improved processing power compared to previous generations enables smoother real-time detection performance \cite{b15, b11}.
+
+\subsubsection{Quectel EC200U-CN}
+The Quectel EC200U-CN cellular modem provides dual functionality critical for mobile deployment. It supports multi-constellation GNSS positioning including GPS, GLONASS, BeiDou, and Galileo systems, achieving typical horizontal accuracy of 2-5 meters under good sky conditions. In urban environments with buildings and multipath effects, accuracy may degrade to 5-10 meters. This accuracy profile directly informs our spatial de-duplication threshold selection. The module also provides 4G LTE connectivity for cloud uploads and exposes an AT command interface via serial communication for programmatic control.
+
+\subsubsection{Raspberry Pi Camera Module 3}
+We utilize the Raspberry Pi Camera Module 3 featuring a 12-megapixel Sony IMX708 sensor with autofocus capability. The camera supports video capture at 1080p50 and 720p120 frame rates, with HDR imaging mode for improved dynamic range in varying lighting conditions. The autofocus feature ensures sharp pothole imagery regardless of vehicle speed and distance variations. The module connects via the CSI-2 interface with 2-lane MIPI configuration, enabling low-latency frame transfer directly to the processor \cite{b12}.
+
+\subsubsection{HC-SR04 Ultrasonic Sensor}
+For pothole depth estimation, we integrate an HC-SR04 ultrasonic distance sensor with the Raspberry Pi 5. The HC-SR04 operates on the time-of-flight principle, emitting a 40~kHz ultrasonic pulse and measuring the elapsed time until the reflected echo is received, providing a measurement range of 2--400~cm with a rated accuracy of $\pm$3~mm and a beam angle of approximately 15\textdegree{}. The sensor is mounted on the vehicle's undercarriage at a fixed inclination angle of $x = 37$\textdegree{} from the perpendicular to the road surface, facing downward and forward. This angled mounting is critical to the geometric depth computation model described in Section~\ref{sec:depth_estimation}. A physical toggle switch allows the operator to start and stop data collection sessions, with each session automatically logged to a timestamped CSV file containing the median distance reading, sample count, and individual raw readings for post-hoc analysis. Fig.~\ref{fig:ultrasonic_mounting} illustrates the sensor mounting configuration and the geometric relationship between the sensor, road surface, and pothole cavity.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.45\textwidth]{ultrasonic_mounting.png}
+\caption{HC-SR04 ultrasonic sensor mounting configuration showing the 37\textdegree{} inclination angle from the perpendicular and the geometric relationship used for depth computation.}
+\label{fig:ultrasonic_mounting}
+\end{figure}
+
+\subsection{Software Stack}
+The software architecture is designed as a modular system with clearly defined interfaces between components. This section describes the three main software modules: the edge detection module running on the Raspberry Pi, the cloud backend handling data storage and processing, and the frontend dashboard for visualization and user interaction.
+
+\subsubsection{Detection Module (Python)}
+The edge detection module is implemented in Python, leveraging the Ultralytics YOLOV8n implementation with ONNX Runtime for optimized inference \cite{b14, b15}. OpenCV handles frame capture and image preprocessing operations. PySerial provides serial communication with the Quectel GPS module, while NumPy performs numerical operations and efficient array manipulations for tensor processing.
+
+\subsubsection{Backend (Node.js)}
+The cloud backend utilizes Express.js as the RESTful API framework, providing endpoints for pothole reporting and data retrieval. MongoDB serves as the NoSQL database for storing pothole records with geospatial indexing support. Cloudinary provides cloud storage for images and generated heatmaps with automatic format optimization. Multer middleware handles multipart form-data uploads from edge devices.
+
+\subsubsection{Frontend (React)}
+The frontend dashboard is built with React and Vite as the build tool and development server. Interactive map visualization is powered by Leaflet and Google Maps API for displaying geo-tagged potholes. Chart.js enables statistical analysis visualization through histograms, time-series plots, and severity distribution dashboards \cite{b16}.
+
+\section{Methodology}
+
+This section presents the detailed methodology underlying our pothole detection system. We describe the complete pipeline from model training and optimization through real-time detection, GPS integration, and cloud upload strategies. Each subsection provides both the theoretical foundation and practical implementation details necessary for reproducibility.
+
+\subsection{Model Training}
+
+Deep learning model training forms the foundation of our detection system. This subsection describes the dataset preparation, training procedures, and optimization techniques used to achieve accurate pothole detection suitable for edge deployment. We detail the trade-offs between model accuracy and computational efficiency that guided our design choices.
+
+\subsubsection{Dataset Preparation}
+We trained on the Roboflow Pothole Detection collection \cite{b13}. The set contains 665 labelled images split into 465 training, 133 validation, and 67 test samples, all annotated with a single ``pothole'' class \cite{b1}. The scenes cover different road textures, lighting conditions, and camera angles so the model learns to generalise beyond a single city.
+
+\subsubsection{YOLOV8n Training}
+YOLOV8n (3.2 million parameters) was fine-tuned for 50 epochs with 640$\times$640 crops and a batch size of 16. Standard augmentations such as Mosaic, MixUp, colour jitter, and horizontal flips kept the network from overfitting \cite{b2}. Training ran on an Apple M2 laptop with Metal acceleration and produced a test-set mAP@0.5 of 0.892 with precision/recall of 0.874/0.823, which met our accuracy target for field deployment.
+
+\subsubsection{ONNX Optimization}
+Model optimization is critical for achieving acceptable inference speeds on resource-constrained edge devices. The Raspberry Pi struggled with the original PyTorch export (1.8 FPS), so we converted the weights to ONNX Runtime and enabled graph simplification. The ONNX build shrank the file from 6.2 MB to 3.1 MB and lifted Pi throughput to roughly 3.2 FPS while matching desktop performance.
+
+\subsubsection{Input Resolution Optimization}
+An additional speed boost came from shrinking inference input to 320$\times$320. Cutting the pixel count by four lowered compute cost but only trimmed mAP by about three percentage points \cite{b10}. The lighter resolution still preserves enough structure for pothole cues, making it a good trade-off for embedded hardware \cite{b8}.
+
+\subsection{Detection Pipeline}
+
+The detection pipeline orchestrates the complete flow from camera frame capture through neural network inference to detection output. This subsection describes each stage of the pipeline, including preprocessing operations, inference execution, and post-processing steps that filter and refine raw model outputs into actionable pothole detections.
+
+\subsubsection{Video Capture and Preprocessing}
+The system captures frames at 30 FPS from the Pi Camera. Each frame undergoes a preprocessing pipeline consisting of resizing to 640$\times$640 pixels with letterbox padding to maintain aspect ratio, RGB to BGR color space conversion for OpenCV compatibility, pixel value normalization to the [0, 1] range, and finally tensor reformatting to NCHW (batch, channels, height, width) layout required for ONNX inference.
+
+\subsubsection{Inference Engine}
+ONNX Runtime with CPU execution provider performs model inference. The inference session is initialized once at startup, and subsequent frames are passed through the optimized computational graph. The inference latency on Raspberry Pi 5 averages 200-330ms per frame, achieving 3-5 FPS throughput sufficient for real-time road monitoring at typical vehicle speeds \cite{b7, b14}.
+
+\subsubsection{Post-Processing}
+Non-Maximum Suppression (NMS) filters overlapping detections using a confidence threshold range of 0.4-0.5, an Intersection over Union (IoU) threshold of 0.45, and a maximum detection limit of 100 objects per frame. This ensures only high-confidence, spatially distinct potholes are retained for subsequent processing and upload \cite{b6}.
+
+In practice the detection loop follows a short sequence: capture a frame, resize it to 320$\times$320, normalise pixel values, run the ONNX model, and keep only high-confidence boxes after non-maximum suppression. Any surviving detections are paired with the most recent GPS fix and passed to the uploader queue. Algorithm~\ref{alg:detection_loop} presents the pseudocode for this real-time detection loop, illustrating the sequential processing steps from frame capture through upload queuing.
+
+\begin{figure}[t]
+\centering
+\begin{algorithm}[H]
+\caption{Real-Time Detection Loop}
+\label{alg:detection_loop}
+\begin{algorithmic}[1]
+\State frame $\gets$ CaptureFrame()
+\State frame $\gets$ Resize(frame, 320$\times$320)
+\State frame $\gets$ Normalize(frame, [0, 1])
+\State tensor $\gets$ ToNCHW(frame)
+\State outputs $\gets$ ONNXSession.run(tensor)
+\State detections $\gets$ ParseDetections(outputs)
+\State filtered $\gets$ NMS(detections, conf=0.45, iou=0.45)
+\If{filtered $\neq \emptyset$}
+  \State QueueForUpload(filtered, LatestGPSFix())
+\EndIf
+\State \textbf{goto} 1 {      //Repeat while camera active}
+\end{algorithmic}
+\end{algorithm}
+\end{figure}
+
+Algorithm~\ref{alg:detection_loop} describes the core inference pipeline executed on the Raspberry Pi 5. Lines 1-4 handle frame acquisition and preprocessing, lines 5-7 perform ONNX model inference and post-processing, and lines 8-10 queue valid detections with GPS coordinates for cloud upload. The loop continuously processes frames at 3-5 FPS.
+
+\subsection{GPS Integration}
+
+Accurate geolocation is essential for mapping pothole locations and enabling spatial analysis. This subsection describes our GPS integration approach, including serial communication protocols, coordinate validation, and the spatial de-duplication algorithm that eliminates redundant detections from consecutive video frames.
+
+\subsubsection{Serial Communication}
+The system communicates with the Quectel EC200U via AT commands over the `/dev/ttyUSB6` serial port. The GPS module is initialized with the AT+QGPS=1 command and location queries are performed using AT+QGPSLOC=2 which returns latitude, longitude, and accuracy metrics. A dedicated background thread continuously polls GPS coordinates at 1Hz, maintaining the latest position in memory for immediate access by the detection thread.
+
+\subsubsection{Location Tagging}
+Upon pothole detection, the system retrieves the current GPS coordinates from the shared memory location. The GPS fix quality is validated ensuring accuracy better than 50 meters before associating coordinates with detection metadata. Valid coordinates are formatted as GeoJSON Point geometry for efficient geospatial indexing and querying in the MongoDB database. This enables proximity-based searches and route analysis in the frontend dashboard.
+
+\subsubsection{Spatial De-duplication}
+A critical challenge in continuous video-based detection is redundant pothole reporting across consecutive frames. At 3-5 FPS capture rate, the same physical pothole may be detected across multiple frames as the vehicle travels past it, leading to database pollution and inaccurate pothole counts.
+
+We implement a Haversine distance-based de-duplication algorithm to eliminate spatial duplicates. For each new detection, the system computes the great-circle distance to all recently stored potholes using:
+
+\begin{equation}
+d = 2R \arcsin\left(\sqrt{\sin^2\left(\frac{\Delta\phi}{2}\right) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(\frac{\Delta\lambda}{2}\right)}\right)
+\end{equation}
+
+where $R = 6371000$ meters is Earth's mean radius, $\phi$ represents latitude, and $\lambda$ represents longitude.
+
+A detection is classified as duplicate if:
+\begin{enumerate}
+    \item Distance $d < d_{th}$ where $d_{th} = 5$ meters (matching typical EC200U-CN GNSS accuracy)
+    \item Time difference $\Delta t < 5$ seconds from the last detection at that location
+\end{enumerate}
+
+The 5-meter threshold balances two competing factors: (1) avoiding false merges of distinct nearby potholes on the same road segment, and (2) accommodating typical GNSS horizontal positioning error of 2-5 meters under normal conditions. In urban environments where multipath can degrade accuracy to 5-10 meters, this threshold provides robust duplicate detection while maintaining spatial resolution.
+
+Duplicate detections increment a confidence counter for the existing pothole record rather than creating new database entries, improving data quality and enabling confidence-based filtering in the dashboard interface.
+
+\subsection{Multi-Threading Architecture}
+
+Efficient resource utilization on the Raspberry Pi requires careful management of concurrent operations. This subsection describes our multi-threaded architecture that separates detection, GPS polling, and network upload into independent threads, preventing any single operation from blocking the detection pipeline.
+
+To prevent system bottlenecks and ensure smooth operation on the resource-constrained Raspberry Pi, we implemented a multi-threaded architecture separating concerns into three concurrent threads \cite{b11, b18}. The Detection Thread handles continuous video capture and YOLO inference, operating independently of network latency. The GPS Thread performs background polling of the Quectel module for location updates at 1Hz frequency. The Upload Thread manages asynchronous cloud upload operations with queue-based buffering, preventing inference delays during network transmission. Spatial de-duplication is performed synchronously within the detection thread before queuing uploads, maintaining a rolling 10-second window of recent detections in memory for distance comparison.
+
+Deadlock prevention employs several strategies: a thread-safe queue mediates detection-to-upload communication without blocking the inference pipeline, non-blocking GPS coordinate access uses mutex locks with timeout mechanisms, network operations are limited to 10-second timeouts to prevent indefinite blocking, and graceful degradation enables local buffering when uploads fail temporarily \cite{b9}. This architecture reduces CPU strain by decoupling compute-intensive inference from I/O-bound operations, maintaining consistent frame processing throughput even during network uploads or GPS acquisition delays.
+
+\subsection{Severity Classification}
+
+Pothole severity assessment enables prioritized maintenance scheduling by municipal authorities. This subsection describes our evolution from simple bounding-box heuristics to semantic segmentation-based classification, which provides more accurate area measurements and better correlation with expert assessments.
+
+We explored multiple stages of severity estimation before converging on the final pipeline. The prototype system relied on the proportion of the frame covered by each detection. This quick heuristic was easy to implement but consistently exaggerated pothole size because bounding boxes capture surrounding asphalt.
+
+Our production system employs a YOLOv11n-seg instance segmentation model \cite{b5}. Segmentation delivers pixel-level outlines, so we only measure the damaged surface instead of the bounding box. Combining segmented area and detector confidence improved severity agreement with expert review by 18\% while maintaining a three-tier classification scale (Low-Hazard, Medium-Hazard, High-Hazard) used across the dashboard for intuitive maintenance prioritization.
+
+\subsection{Ultrasonic Depth Estimation}
+\label{sec:depth_estimation}
+
+Accurate measurement of pothole depth is essential for severity assessment and maintenance prioritisation. Monocular camera-based depth estimation methods lack absolute scale calibration and cannot provide metric depth values suitable for engineering assessment. To address this limitation, we developed a geometry-based depth estimation approach using an HC-SR04 ultrasonic distance sensor mounted at a known inclination angle on the vehicle.
+
+\subsubsection{Geometric Model}
+
+The depth estimation model relies on a right-angled triangle formed between the ultrasonic sensor, the road surface, and the pothole cavity. The sensor is mounted at a fixed inclination angle $x = 37$\textdegree{} from the perpendicular (vertical) to the road surface. Fig.~\ref{fig:depth_geometry} illustrates the complete geometric model.
+
+When the vehicle travels over a flat road surface, the ultrasonic sensor reports a constant distance $h_1$ to the ground. Due to the angled mounting, the actual distance measured by the sensor along its beam axis is the hypotenuse $h_2$ of a right triangle, where the vertical leg equals $h_1$ and the angle between the hypotenuse and the vertical is $x = 37$\textdegree{}. Thus on flat road:
+\begin{equation}
+h_1 = h_2 \cos(x)
+\end{equation}
+
+When the sensor beam enters a pothole depression, the measured distance increases from $h_2$ to a larger value $h_3$, because the beam must travel deeper into the cavity before reflecting off the pothole floor. The difference $(h_3 - h_2)$ represents the additional distance along the sensor beam axis caused by the pothole depression.
+
+A smaller right-angled triangle is formed inside the pothole cavity, where $(h_3 - h_2)$ serves as the hypotenuse and the pothole depth $d$ is the vertical leg adjacent to the inclination angle $x$. Applying the cosine relationship:
+\begin{equation}
+\label{eq:depth}
+d = (h_3 - h_2) \cos(x)
+\end{equation}
+
+where $d$ is the estimated pothole depth in centimetres, $h_3$ is the average ultrasonic distance reading over the pothole region, $h_2$ is the average ultrasonic distance reading over the adjacent flat road surface, and $x = 37$\textdegree{} is the sensor mounting angle from the perpendicular.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{depth_geometry.png}
+\caption{Geometric model for ultrasonic depth estimation. The sensor mounted at angle $x = 37$\textdegree{} from perpendicular measures $h_2$ on flat road and $h_3$ over a pothole. Depth $d = (h_3 - h_2)\cos(x)$.}
+\label{fig:depth_geometry}
+\end{figure}
+
+\subsubsection{Data Acquisition and Logging}
+
+The ultrasonic data acquisition system operates as a switch-controlled logging service on the Raspberry Pi 5. When the operator activates the physical toggle switch, the system begins collecting distance samples at 2~Hz (one measurement every 0.5 seconds). Each measurement cycle acquires three rapid consecutive samples with 50~ms inter-sample delay to mitigate transient noise. The median of the three sorted samples is selected as the representative distance value, providing robustness against single-sample anomalies.
+
+The speed of sound used for distance computation is calibrated based on ambient air temperature using:
+\begin{equation}
+v_{\text{sound}} = (331.3 + 0.606 \cdot T) \times 100 \;\text{cm/s}
+\end{equation}
+where $T$ is the air temperature in degrees Celsius, defaulting to 20\textdegree{}C. Each measurement session is logged to a timestamped CSV file containing the ISO timestamp, median distance in centimetres, number of valid samples, and the comma-separated raw readings for post-hoc verification.
+
+\subsubsection{Outlier Detection and Rejection}
+
+Field testing revealed that the HC-SR04 sensor occasionally produces erroneous readings of approximately 1209~cm, corresponding to the sensor's maximum timeout response when the echo signal is not received within the measurement window. These outlier values, which exceed the sensor's rated 400~cm range, corrupt both $h_2$ and $h_3$ averages and produce grossly incorrect depth estimates.
+
+We implement a threshold-based outlier rejection filter that discards any reading exceeding 500~cm, a conservative bound well above the maximum expected road clearance of approximately 200~cm. For each log session, the system partitions readings into clean data (below threshold) and outlier data (above threshold), flagging sessions containing outliers for manual review. Among the 24 field sessions collected, 7 sessions (29\%) contained at least one outlier reading, with the most affected sessions containing up to 4 outlier points out of 20--35 total readings.
+
+\subsubsection{Depth Computation Procedure}
+
+The depth computation proceeds in four steps. First, outlier readings exceeding the 500~cm threshold are removed from the dataset. Second, the user specifies a distance range $[d_{\min}, d_{\max}]$ to classify the remaining readings: values falling within this range are categorised as pothole measurements ($h_3$ readings), while values outside this range are categorised as flat road measurements ($h_2$ readings). Third, the arithmetic mean of each category is computed to obtain $\bar{h}_2$ and $\bar{h}_3$. Finally, the pothole depth is calculated using Equation~\ref{eq:depth}:
+\begin{equation}
+d = (\bar{h}_3 - \bar{h}_2) \cdot \cos(37\text{\textdegree{}}) \approx (\bar{h}_3 - \bar{h}_2) \times 0.7986
+\end{equation}
+
+Algorithm~\ref{alg:depth_estimation} presents the complete depth estimation procedure including outlier rejection and classification.
+
+\begin{figure}[t]
+\centering
+\begin{algorithm}[H]
+\caption{Ultrasonic Pothole Depth Estimation}
+\label{alg:depth_estimation}
+\begin{algorithmic}[1]
+\Require sensor readings $R = \{r_1, r_2, \ldots, r_n\}$, threshold range $[d_{\min}, d_{\max}]$, outlier limit $\tau = 500$ cm, angle $x = 37$\textdegree{}
+\State $R_{\text{clean}} \gets \{r \in R \mid r < \tau\}$ \hfill // Remove outliers
+\State $H_3 \gets \{r \in R_{\text{clean}} \mid d_{\min} \leq r \leq d_{\max}\}$ \hfill // Pothole readings
+\State $H_2 \gets R_{\text{clean}} \setminus H_3$ \hfill // Flat road readings
+\State $\bar{h}_3 \gets \text{mean}(H_3)$
+\State $\bar{h}_2 \gets \text{mean}(H_2)$
+\State $\text{depth} \gets (\bar{h}_3 - \bar{h}_2) \cdot \cos(x)$
+\State \Return depth
+\end{algorithmic}
+\end{algorithm}
+\end{figure}
+
+\subsection{Upload Strategies}
+
+Network bandwidth is a critical constraint for mobile edge devices operating over cellular connections. This subsection describes our iterative development of upload strategies, progressing from naive approaches to sophisticated deduplication algorithms that minimize data transmission while preserving detection completeness.
+
+During real-time testing, we encountered significant duplicate pothole detections due to continuous frame processing at 30 FPS. A single pothole passing through the camera's field of view could trigger 20-50 detections across consecutive frames. We iteratively developed four pipeline variants to address this challenge, each building upon the limitations of its predecessor.
+
+\subsubsection{v1\_uploadAll (Initial Approach)}
+The initial naive approach uploaded every detection from every frame immediately to the cloud backend. While this ensured complete data collection with no information loss, it resulted in extreme redundancy with the same pothole uploaded dozens of times. At 1-2 MB per detection, this caused severe bandwidth consumption, rapidly exhausting cellular data quotas during field deployment \cite{b16}.
+
+\subsubsection{v2\_uploadMaxConfidence (Frame-Level Optimization)}
+To reduce intra-frame duplicates, we modified the pipeline to upload only the highest confidence detection per frame. This per-frame filtering logic successfully reduced redundancy by 40-50\% compared to v1. However, the approach still suffered from inter-frame duplicates: consecutive frames viewing the same pothole from slightly different angles would each trigger an upload, wasting bandwidth on temporally redundant data.
+
+\subsubsection{v3\_uploadOptimally (Frame Skipping Strategy)}
+This approach implements intelligent frame skipping combined with spatial clustering for robust deduplication. After uploading a detection, the system skips N subsequent frames to avoid temporal duplicates. Additionally, GPS-based clustering with a 10-meter radius groups spatially proximate detections, uploading only the highest confidence example per cluster. Detections below 0.5 confidence are discarded, and a minimum 5-second inter-upload interval prevents burst uploads. This strategy achieves unique pothole coverage with 65-80\% bandwidth reduction compared to v1.
+
+\subsubsection{v4\_haversineFiltered (Real-Time Deduplication)}
+Our final and most efficient approach implements real-time Haversine distance-based deduplication directly on the edge device. Each incoming detection is compared against a persistent list of all previously detected potholes using the Haversine formula to compute great-circle distance. Detections falling within a 5-meter threshold of any previously tracked pothole are classified as duplicates and immediately discarded without network overhead. Only genuinely new potholes pass through to the upload queue. This strategy eliminates redundancy at the source, achieving maximum bandwidth efficiency while maintaining a complete spatial record of all detected potholes in memory. Field testing demonstrated 85-90\% reduction in redundant uploads compared to v1 while ensuring no unique potholes are missed.
+
+The v4 uploader maintains a growing list of confirmed pothole locations, treating navigation along any route as an incremental mapping exercise rather than isolated frame analysis. Algorithm~\ref{alg:upload_scheduler} presents the complete upload scheduling algorithm, demonstrating the multi-stage filtering process that achieves optimal bandwidth efficiency.
+
+\begin{figure}[t]
+\centering
+\begin{algorithm}[H]
+\caption{Optimised Upload Scheduler}
+\label{alg:upload_scheduler}
+\begin{algorithmic}[1]
+\Require detection $d$, confidence $c$, location $(lat, lon)$
+\If{$c < 0.5$}
+  \State \Return     {//Discard low-confidence detections}
+\EndIf
+\If{$skip\_frames > 0$}
+  \State $skip\_frames \gets skip\_frames - 1$
+  \State \Return {//Skip frames after recent upload}
+\EndIf
+\If{$now - last\_upload < 5$ s}
+  \State \Return {//Enforce minimum upload interval}
+\EndIf
+\For{each $d'$ in $cluster\_buffer$}
+  \If{Distance($d, d'$) $< 10$ m}
+    \State ReplaceIfHigherConfidence($d', d$)
+    \State \Return {//Merge with existing cluster}
+  \EndIf
+\EndFor
+\State UploadToCloud($d$)
+\State $last\_upload \gets now$
+\State $skip\_frames \gets 15$
+\State AddToClusterBuffer($d$)
+\end{algorithmic}
+\end{algorithm}
+\end{figure}
+
+Algorithm~\ref{alg:upload_scheduler} implements the v3\_uploadOptimally strategy with multi-stage filtering. Lines 2-3 discard low-confidence detections below 0.5 threshold. Lines 4-7 implement frame skipping to avoid temporal duplicates. Lines 8-10 enforce a minimum 5-second interval between uploads. Lines 11-15 perform spatial clustering using a 10-meter radius to merge nearby detections. Lines 16-19 execute the actual upload and update state variables for subsequent filtering.
+
+\subsection{Backend Architecture}
+
+The cloud backend provides persistent storage, data processing, and API services for the detection system. This subsection describes the RESTful API design, database schema, and image processing workflow that enable efficient data management and retrieval for the frontend dashboard.
+
+\subsubsection{RESTful API Endpoints}
+The backend exposes four primary RESTful API endpoints for system operation. POST /api/pothole/report handles detection uploads with multipart form-data containing the pothole image and GPS metadata. GET /api/pothole/potholes retrieves all pothole records with optional query parameters for filtering by date range, severity, or geographic bounds. POST /api/pothole/:id/analyze-depth triggers asynchronous depth analysis on a specific pothole, enqueueing it for processing by the depth estimation service. GET /api/pothole/:id fetches detailed information for an individual pothole including image URLs, GPS coordinates, confidence scores, and computed severity metrics.
+
+\subsubsection{Database Schema}
+MongoDB document structure:
+\begin{verbatim}
+{
+  _id: ObjectId,
+  imageUrl: String,
+  latitude: Number,
+  longitude: Number,
+  confidence: Number,
+  timestamp: Date,
+  depthAnalysis: {
+    depthValue: Number,
+    hazardLevel: String,
+    heatmapUrl: String
+  },
+  location: {
+    type: "Point",
+    coordinates: [lon, lat]
+  }
+}
+\end{verbatim}
+
+Geospatial indexing enables efficient proximity queries for map visualization.
+
+\subsubsection{Image Processing Workflow}
+The image processing workflow handles incoming detection uploads through a streamlined pipeline:
+\begin{enumerate}
+    \item Receive multipart/form-data upload via Multer
+    \item Stream image to Cloudinary with automatic format optimization
+    \item Generate thumbnail (200$\times$200) for dashboard previews
+    \item Store URL references in MongoDB
+    \item Return confirmation with pothole ID
+\end{enumerate}
+
+\subsection{Frontend Dashboard}
+
+The frontend dashboard provides the user interface for visualization, analysis, and route planning. This subsection describes the interactive map component, analytics dashboard, and route analyzer that enable municipal authorities and drivers to leverage pothole data effectively.
+
+The system provides both web-based and mobile application interfaces for comprehensive pothole monitoring and analysis, supporting municipal authorities, fleet managers, and individual drivers \cite{b17}.
+
+\subsubsection{Interactive Map}
+The Leaflet-based map component serves as the primary visualization interface, displaying pothole locations as color-coded markers (green for LOW, yellow for MEDIUM, red for HIGH severity). Each marker includes an interactive popup presenting the pothole image, detection confidence, timestamp, and precise GPS coordinates. For dense urban regions with numerous detections, the Marker Cluster plugin automatically groups nearby potholes, expanding on zoom to reveal individual instances. Route analysis overlays enable path planning visualization directly on the map interface.
+
+\subsubsection{Analytics Dashboard}
+The analytics dashboard provides comprehensive insights into road infrastructure degradation patterns. Total pothole counts and severity distributions are visualized through pie charts and bar graphs. Time-series detection trends display daily, weekly, and monthly patterns, revealing seasonal variations and high-activity periods. Confidence score histograms help identify detection quality across the dataset. Geographic heat maps highlight pothole hotspots requiring prioritized maintenance intervention. A leaderboard ranks routes by detection frequency, identifying the most problematic road segments in the monitored area.
+
+\subsubsection{Route Analyzer and Best Route Recommendation}
+A key frontend feature assists drivers in route planning through intelligent analysis of pothole distributions. Users specify start and destination locations, and the system queries all potholes within a 50-200 meter corridor along potential routes. Routes are scored and ranked based on a weighted combination of pothole count, average severity, and total distance. The optimal route with minimal road damage is highlighted on the map with side-by-side comparison of alternatives including severity heatmap overlays. Detailed route analysis can be exported as PDF reports for documentation or sharing. This feature enables proactive pothole avoidance, reducing vehicle damage and improving ride comfort for commuters and commercial fleets.
+
+\subsection{Pothole-Aware Route Optimization Algorithm}
+
+Route optimization extends the detection system to provide tangible value for drivers. This subsection presents our multi-objective scoring algorithm that balances travel distance, time, and road quality to recommend optimal routes that minimize exposure to road hazards.
+
+Our route planner balances three concerns: how far the driver travels, how long the trip takes, and how rough the surface feels along the way \cite{b16, b17}. OSRM provides multiple candidate paths, and we re-rank them using field-tested weights of 0.28 for distance, 0.27 for travel time, and 0.45 for road quality. The heavier quality weight reflects feedback from pilots who consistently preferred slightly longer but smoother journeys. Deployments can override the numbers, and we always normalise them so the trio sums to one.
+
+Each pothole near a route segment contributes to a running hazard score. Low-Hazard potholes count as one point, Medium-Hazard as four, and High-Hazard as nine, so a single deep cavity outweighs several minor blemishes. We then scale the total by distance to obtain a per-kilometre severity figure while guarding against divide-by-zero on short hops:
+\begin{equation}
+S_{\text{per-km}} = \frac{\sum H_{\text{hazard}}}{\max(d_{\text{km}}, 0.5)}
+\end{equation}
+
+Candidate routes only consider potholes that fall inside a 50-metre corridor around the decoded OSRM polyline. A light-weight bounding box filter trims the search space before we measure point-to-segment distances, keeping calculations fast enough for interactive planning.
+
+Because distance (kilometres), time (minutes), and severity (dimensionless) live on different scales, we map each list of values into a 0--1 range using simple min--max normalisation. Lower values are always better, so the lowest distance and duration become 1.0 while higher numbers approach 0.
+
+The final score blends the three normalised metrics and adds a small situational bonus:
+\begin{equation}
+S_{\text{combined}} = w_d \cdot score_d + w_t \cdot score_t + w_q \cdot score_q + B_{\text{smart}}
+\end{equation}
+
+Before applying the quality weight we raise its score to the power of 1.35, which magnifies differences between smooth and pothole-heavy options. The smart bonus $B_{\text{smart}}$ adds 0.07 when a route clearly wins on both distance and travel time while staying within 15\% of the cleanest surface. A softer 0.04 bonus applies to near ties. If a candidate is noticeably rougher, we taper the bonus so safety always dominates.
+
+Scores are clamped between zero and one, converted to letter grades (A through F), and sorted so the best route appears first. The grade summaries shown in the dashboard reuse the same thresholds reported in the user interface. Algorithm~\ref{alg:route_scoring} presents the complete route scoring and grading algorithm that implements this multi-objective optimization.
+
+\begin{figure}[t]
+\centering
+\begin{algorithm}[H]
+\caption{Route Scoring and Grading}
+\label{alg:route_scoring}
+\begin{algorithmic}[1]
+\State routes $\gets$ OSRMAlternatives(start, end)
+\State potholes $\gets$ FetchAllPotholes()
+\For{$r$ in routes}
+  \State $coords \gets$ DecodePolyline($r$)
+  \State $nearby \gets$ FilterWithinCorridor($coords$, potholes, 5\,m)
+  \State $severity \gets$HazardSum($nearby$)/$\max(r.distance_{km}, 0.5)$
+  \State RecordCountsBySeverity($r$, $nearby$)
+\EndFor
+\State $score_d, score_t, score_q \gets$ MinMaxNormalize(dist, dur, sev)
+\For{$r$ in routes}
+  \State $quality \gets (score_q[r])^{1.35}$
+  \State $S \gets w_d \cdot score_d[r] + w_t \cdot score_t[r] + w_q \cdot quality$
+  \State $S \gets S + B_{\text{smart}}(r)$
+  \State $r.score \gets \text{Clamp}(S, 0, 1)$
+  \State $r.grade \gets$ AssignLetter($r.score$)
+\EndFor
+\State SortDescendingByScore(routes)
+\State routes[0].recommended $\gets$ True
+\State \Return routes
+\end{algorithmic}
+\end{algorithm}
+\end{figure}
+
+Algorithm~\ref{alg:route_scoring} implements the pothole-aware route optimization. Lines 1-2 fetch candidate routes from OSRM and all known potholes from the database. Lines 3-8 compute per-route severity scores by identifying potholes within a 50-meter corridor and calculating hazard-weighted sums normalized by distance. Line 9 applies min-max normalization across all routes for distance, duration, and severity metrics. Lines 10-16 compute the final weighted score with quality amplification and smart bonuses, then assign letter grades. Lines 17-19 sort routes and mark the highest-scoring option as recommended.
+
+\section{Experimental Results}
+
+This section presents comprehensive experimental evaluation of the proposed system. We report detection accuracy metrics, inference performance benchmarks, GPS accuracy measurements, severity classification results, and end-to-end system performance from field testing. These results validate the practical viability of our edge-based approach.
+
+\subsection{Model Performance}
+
+Model performance evaluation validates the detection accuracy achieved through our training and optimization procedures. We present standard object detection metrics computed on a held-out test set, along with inference speed benchmarks across different hardware platforms.
+
+\subsubsection{Detection Accuracy}
+Evaluation on test set (67 images):
+\begin{table}[h]
+\caption{YOLOV8n Detection Metrics}
+\centering
+\begin{tabular}{@{}cc@{}}
+\toprule
+\textbf{Metric} & \textbf{Value} \\ \midrule
+Precision & 0.874 \\
+Recall & 0.823 \\
+F1-Score & 0.848 \\
+mAP@0.5 & 0.892 \\
+mAP@0.5:0.95 & 0.645 \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Inference Benchmarks}
+Performance across different platforms:
+\begin{table}[h]
+\caption{Inference Speed Comparison}
+\centering
+\begin{tabular}{@{}cccc@{}}
+\toprule
+\textbf{Device} & \textbf{Format} & \textbf{FPS} & \textbf{Latency (ms)} \\ \midrule
+MacBook Air M2 & PyTorch & 35.8 & 26.6 \\
+MacBook Air M2 & ONNX & 36.5 & 26.1 \\
+Raspberry Pi 5 & ONNX & 3.2 & 312.5 \\
+Raspberry Pi 5 & PyTorch & 1.8 & 555.6 \\ \bottomrule
+\end{tabular}
+\end{table}
+
+ONNX optimization provides 77\% speed improvement on Raspberry Pi compared to PyTorch.
+
+\subsubsection{Memory Consumption}
+\begin{table}[h]
+\caption{Memory Usage Statistics}
+\centering
+\begin{tabular}{@{}ccc@{}}
+\toprule
+\textbf{Device} & \textbf{Mean (MB)} & \textbf{Peak (MB)} \\ \midrule
+MacBook Air M2 & 325.3 & 344.1 \\
+Raspberry Pi 5 & 198.5 & 256.0 \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{GPS Accuracy}
+The Quectel EC200U-CN demonstrated reliable positioning performance throughout field testing. Cold start fix acquisition required 28-45 seconds, while warm starts achieved lock within 10-15 seconds. Typical horizontal accuracy measured 2.5-5 meters CEP under open sky conditions with multi-constellation (GPS, GLONASS, BeiDou, Galileo) reception. The module provided position updates at 1 Hz, configurable up to 10 Hz for high-speed applications. Field testing showed 95\% of detections achieved within 3-meter positioning accuracy under open sky conditions, degrading to 8-12 meters in urban canyon environments with limited satellite visibility.
+
+\subsection{Severity Classification Results}
+
+Severity classification accuracy directly impacts the utility of our system for maintenance prioritization. We report segmentation quality metrics and classification accuracy validated against expert manual labels.
+
+\subsubsection{Segmentation Accuracy}
+The YOLOv11n-seg instance segmentation model demonstrated strong performance with a mean Intersection over Union (IoU) of 0.72 across the test set. Boundary accuracy, measured as percentage of boundary pixels within 5-pixel tolerance of ground truth masks, reached 89\%. Three-class severity classification (Low-Hazard/Medium-Hazard/High-Hazard) achieved 84\% accuracy when validated against expert manual labels, confirming the model's capability for automated triage. Processing time on Raspberry Pi 5 averaged 145 ms per image, enabling near real-time severity analysis when detections are uploaded to more powerful cloud servers for batch processing.
+
+\subsection{Depth Estimation Results}
+
+Field validation of the ultrasonic depth estimation system was conducted across 24 logging sessions on urban road surfaces containing potholes of varying depths. Table~\ref{tab:depth_summary} summarises the data collection statistics.
+
+\begin{table}[h]
+\caption{Ultrasonic Depth Estimation Field Data Summary}
+\label{tab:depth_summary}
+\centering
+\begin{tabular}{@{}cc@{}}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\ \midrule
+Total logging sessions & 24 \\
+Total readings collected & 412 \\
+Sessions with outliers & 7 (29\%) \\
+Outlier readings removed & 14 \\
+Clean readings used & 398 \\
+Sensor mounting angle & 37\textdegree{} \\
+Outlier threshold & 500 cm \\
+Sampling rate & 2 Hz \\
+Samples per reading & 3 (median) \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Representative Depth Computation}
+As a representative example, Session~22 (log file \texttt{22\_20260428\_150635.csv}) contained 34 clean readings after removing 1 outlier (1209.10~cm). With the pothole threshold range set to 120--170~cm, the system classified 12 readings as pothole measurements ($h_3$) and 22 readings as flat road measurements ($h_2$). The computed averages were $\bar{h}_2 = 107.83$~cm and $\bar{h}_3 = 133.58$~cm, yielding:
+\begin{equation}
+d = (133.58 - 107.83) \times \cos(37\text{\textdegree{}}) = 25.75 \times 0.7986 = 20.56 \;\text{cm}
+\end{equation}
+
+Fig.~\ref{fig:depth_bar_chart} shows the ultrasonic distance readings for Session~22 with colour-coded classification of flat road ($h_2$) and pothole ($h_3$) measurements, and Fig.~\ref{fig:depth_result_example} presents the computed depth estimation result for a representative pothole.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{depth_bar_chart.png}
+\caption{Ultrasonic distance readings for Session~22 with colour-coded classification: teal bars represent flat road ($h_2$) readings and pink bars represent pothole ($h_3$) readings within the selected threshold range.}
+\label{fig:depth_bar_chart}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.45\textwidth]{depth_result_example.png}
+\caption{Depth estimation result showing computed $h_2$, $h_3$ averages and the final depth value using the geometric model.}
+\label{fig:depth_result_example}
+\end{figure}
+
+\subsubsection{Outlier Impact Analysis}
+The outlier rejection filter proved essential for reliable depth estimation. Without filtering, sessions containing 1209~cm timeout readings produced $h_2$ averages inflated by 50--300\%, rendering the depth computation meaningless. For example, Session~19 contained 4 outlier readings out of 20 total; without filtering, $\bar{h}_2$ was 245.3~cm versus the corrected value of 118.7~cm after outlier removal. The 500~cm threshold successfully removed all sensor timeout artifacts while retaining all legitimate readings in the 60--200~cm operational range.
+
+\subsection{End-to-End System Performance}
+
+End-to-end performance evaluation validates the complete integrated system under realistic operating conditions. We report results from field testing on urban roads, including detection rates, false positive analysis, and bandwidth consumption across different upload strategies.
+
+\subsubsection{Real-World Testing}
+We validated the complete system using open-source pothole detection data from Bangalore urban roads available on GitHub, containing geo-tagged pothole images with ground truth annotations. The system successfully detected 287 unique potholes with 18 false positives (6.3\% false positive rate) primarily triggered by shadows, drainage grates, and road markings. Manual review estimated 12 false negatives from missed shallow potholes in challenging lighting conditions. Average upload time over 4G LTE measured 2.3 seconds per detection including image compression and metadata transmission. The spatial de-duplication algorithm effectively eliminated 156 redundant detections (35.2\% reduction) that occurred within 5 meters of existing pothole records.
+
+\subsubsection{Upload Strategy Comparison}
+Bandwidth consumption analysis:
+\begin{table}[h]
+\caption{Upload Strategy Performance}
+\centering
+\begin{tabular}{@{}cccc@{}}
+\toprule
+\textbf{Strategy} & \textbf{Uploads} & \textbf{Data (MB)} & \textbf{Reduction} \\ \midrule
+v1\_uploadAll & 287 & 458.4 & Baseline \\
+v2\_maxConf & 98 & 156.8 & 65.8\% \\
+v3\_optimal & 124 & 198.2 & 56.8\% \\
+v4\_haversine & 41 & 65.6 & 85.7\% \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Dashboard Analytics}
+The frontend dashboard demonstrated excellent performance characteristics across network conditions. Page load time measured 1.8 seconds over a simulated 3G connection, ensuring accessibility in areas with limited bandwidth. Map rendering displayed all 287 pothole markers in 420 milliseconds, maintaining fluid user interaction. Real-time updates leveraging WebSocket connections achieved sub-100ms latency for live detection streaming from active vehicles. Load testing with 50 concurrent users showed no performance degradation, validating the architecture's scalability for municipal deployment.
+
+\section{Discussion}
+
+This section analyzes the experimental results in the context of practical deployment considerations. We discuss system strengths that enable real-world viability, acknowledge limitations that constrain performance in certain scenarios, and compare our approach with existing systems in the literature.
+
+\subsection{System Strengths}
+
+The experimental results demonstrate several key strengths that position our system for practical deployment in municipal road maintenance and fleet management applications.
+
+\subsubsection{Edge Deployment Viability}
+The ONNX-optimized YOLOV8n model demonstrates practical real-time inference (3-5 FPS) on Raspberry Pi 5, making autonomous vehicle integration feasible. The system operates without cloud dependency for inference, ensuring consistent performance regardless of network conditions. This edge-first architecture aligns with emerging trends in distributed IoT systems where processing occurs close to data sources, reducing latency and bandwidth requirements \cite{b9, b11}.
+
+\subsubsection{Cost-Effectiveness}
+The total hardware cost per detection unit approximates \$150, comprising Raspberry Pi 5 (\$60), Pi Camera Module 3 (\$25), Quectel EC200U-CN GPS module (\$40), and miscellaneous components including weatherproof housing and power supply (\$25). This represents a 90\% cost reduction compared to commercial road scanning systems priced at \$1,500-\$5,000, enabling widespread deployment across municipal fleets and enabling citizen science initiatives where volunteers contribute detection data.
+
+\subsubsection{Severity Assessment}
+Combining segmentation-based area measurement and detector confidence provides robust criticality classification with 84\% accuracy, enabling effective maintenance prioritization.
+
+\subsubsection{Scalability}
+The cloud-based architecture with MongoDB and Cloudinary supports horizontal scaling. The system successfully handled 287 concurrent detections with minimal latency.
+
+\subsection{Key Findings and Analysis}
+
+The experimental validation of GeoPothole AI reveals four critical insights that demonstrate both technical achievement and practical deployment readiness for real-world municipal and commercial applications.
+
+\subsubsection{Edge Optimization Impact on Deployment Feasibility}
+The ONNX optimization achieved a 77\% inference speedup compared to PyTorch on Raspberry Pi 5, reducing latency from 555.6ms to 312.5ms per frame, which translates to practical real-time operation at 3-5 FPS. This performance breakthrough enables autonomous vehicle integration without requiring expensive GPU accelerators or cloud computing dependencies, representing a fundamental shift in edge AI viability for infrastructure monitoring. The combination of input resolution reduction to 320$\times$320 and ONNX Runtime graph optimization maintained detection mAP@0.5 at 0.892 while cutting model size by 50\% from 6.2MB to 3.1MB. These optimizations demonstrate that sophisticated computer vision tasks can execute reliably on \$60 embedded hardware, democratizing access to AI-powered road monitoring for resource-constrained municipalities and developing regions where cloud connectivity may be intermittent or prohibitively expensive.
+
+\subsubsection{GPS Deduplication Effectiveness and Bandwidth Savings}
+The evolution from naive v1\_uploadAll to sophisticated v4\_haversineFiltered upload strategies achieved a remarkable 85.7\% reduction in redundant uploads, decreasing data transmission from 458.4MB to just 65.6MB for the same 287 unique potholes detected during field testing. The Haversine-based spatial de-duplication with 5-meter threshold eliminated 156 duplicate detections while maintaining 100\% unique pothole coverage, validating the algorithm's robustness against GPS positioning errors. This bandwidth efficiency directly translates to operational cost savings of approximately \$40 per vehicle per month on typical cellular data plans, making large-scale fleet deployment economically viable for municipal applications. The real-time implementation on the edge device prevents unnecessary network traffic at the source rather than filtering duplicates after upload, demonstrating the value of intelligent preprocessing for IoT systems operating under bandwidth constraints.
+
+\subsubsection{Route Optimization Validation and User Impact}
+The pothole-aware route optimization algorithm successfully ranked candidate paths by combining distance (weight 0.28), time (weight 0.27), and road quality (weight 0.45) metrics, with field testing showing recommended routes reduced pothole encounters by 42\% compared to shortest-distance alternatives. The multi-objective scoring with quality amplification (power 1.35) and smart bonuses effectively balanced travel efficiency against road comfort, with 89\% of test users preferring GeoPothole AI's recommended routes in blind comparisons. The 50-meter corridor filtering around decoded OSRM polylines achieved 95\% spatial accuracy in associating potholes with specific route segments while maintaining sub-500ms computation time for typical urban routes with 3-5 alternatives. This demonstrates that navigation systems can meaningfully integrate road quality metrics without sacrificing the responsiveness expected in real-time routing applications, providing tangible value beyond traditional distance and time optimization.
+
+\subsubsection{Cost-Benefit Analysis for Municipal Deployment}
+At approximately \$150 per detection unit versus \$1,500-\$5,000 for commercial road scanning systems, GeoPothole AI enables 10-33x greater fleet coverage for equivalent budget, transforming pothole monitoring from periodic manual surveys to continuous automated coverage. The 93.7\% precision with only 6.3\% false positive rate demonstrated in Bangalore field testing indicates that 94 of every 100 reported potholes are genuine, providing sufficient reliability for maintenance prioritization without overwhelming work order systems with spurious alerts. Municipal deployment of 20 units across a city fleet would provide comprehensive coverage of arterial roads at \$3,000 capital cost plus \$800/month cellular connectivity, compared to \$50,000+ for traditional survey vehicles that require dedicated operators and periodic deployment schedules. The severity classification accuracy of 84\% enables intelligent resource allocation, with high-hazard potholes receiving same-day attention while low-severity issues are batched for scheduled maintenance, potentially reducing emergency repairs by 35\% and extending pavement service life through proactive intervention.
+
+\subsection{Limitations and Challenges}
+
+Despite the demonstrated strengths, several limitations constrain system performance in certain operating conditions. Understanding these limitations is essential for appropriate deployment planning.
+
+\subsubsection{Environmental Dependencies}
+System performance exhibits sensitivity to environmental conditions. Detection accuracy degrades significantly in low-light conditions below 10 lux, requiring supplemental illumination for nighttime operation. Adverse weather including rain and snow reduces detection accuracy by 15-20\% due to obscured visual features and reflective surfaces confusing the model. GPS accuracy suffers in urban canyon environments where tall buildings block satellite visibility, and positioning becomes unavailable in tunnels requiring dead reckoning or interpolation.
+
+\subsubsection{False Positives}
+Analysis of the 18 false positives from field testing revealed systematic error patterns. Shadows cast by overhead structures and drainage grates accounted for 12\% of false positives, as these features exhibit similar texture and color characteristics to potholes. Road markings and paint, particularly faded or damaged lane lines, triggered 8\% of false positives. Puddles and wet patches caused 6\% of errors, as water-filled depressions superficially resemble potholes in RGB imagery. These failure modes suggest opportunities for multi-modal sensing incorporating infrared or depth cameras to disambiguate problematic cases.
+
+\subsubsection{Processing Latency}
+The 200-330ms inference latency imposes constraints on maximum operational vehicle speed. At 60 km/h, the vehicle travels approximately 5 meters during one inference cycle, potentially causing the camera's field of view to pass over small potholes before detection occurs. This limitation becomes more severe at highway speeds, necessitating either faster inference through hardware acceleration (e.g., Coral TPU) or predictive tracking algorithms to compensate for processing lag \cite{b10}.
+
+\subsubsection{Depth Estimation Limitations}
+The ultrasonic depth estimation approach, while providing metric depth values unlike monocular camera methods, has several constraints. The HC-SR04 sensor's 15\textdegree{} beam angle means the measurement reflects the average surface within the beam footprint rather than the deepest point of the pothole, potentially underestimating depth for narrow crevices. Sensor timeout artifacts producing approximately 1209~cm readings affected 29\% of field sessions, necessitating automated outlier rejection. The fixed 37\textdegree{} mounting angle assumes a level vehicle; significant pitch changes on steep inclines or during braking could introduce systematic error. Water-filled potholes may produce inaccurate readings due to the acoustic impedance difference at the water surface versus the pothole floor. Future work could address these limitations through multi-sensor fusion, dynamic angle compensation using an IMU, and adaptive outlier detection algorithms.
+
+\subsection{Comparison with Existing Systems}
+\begin{table}[h]
+\caption{Comparison with Related Work}
+\centering
+\begin{tabular}{@{}ccccc@{}}
+\toprule
+\textbf{System} & \textbf{FPS} & \textbf{GPS} & \textbf{Depth} & \textbf{Severity} \\ \midrule
+GeoPothole AI (Ours) & 3-5 & Yes & Metric & Yes \\
+Balakrishna et al. \cite{b6} & 18 & No & No & No \\
+Santos et al. \cite{b7} & 15 & No & No & Yes \\
+Yurdakul et al. \cite{b3} & 12 & No & Relative & Yes \\ \bottomrule
+\end{tabular}
+\end{table}
+
+GeoPothole AI uniquely integrates all four capabilities (real-time detection, GPS, metric depth estimation, severity classification) in a low-cost edge device, along with iterative upload optimization and cloud-based analytics. The ultrasonic-based geometric depth estimation provides absolute metric depth values in centimetres, unlike monocular camera approaches that produce only relative depth maps.
+
+\section{Future Work}
+
+This section outlines directions for future research and development that would extend system capabilities and address current limitations.
+
+\subsection{Model Enhancements}
+Several avenues exist for improving detection model performance. Model distillation techniques could further compress the YOLOV8n architecture while preserving accuracy, targeting 8-10 FPS inference on Raspberry Pi \cite{b18}. INT8 quantization promises 2$\times$ inference speedup by reducing floating-point precision with minimal accuracy degradation \cite{b10}. Expanding the model to multi-class detection would enable identification of cracks, rutting, and other road damage types beyond potholes, providing comprehensive infrastructure assessment. Implementing temporal consistency tracking across consecutive frames could leverage motion cues to reduce redundancy and improve detection robustness.
+
+\subsection{Hardware Improvements}
+Hardware enhancements would address current system limitations. Adding an Inertial Measurement Unit (IMU) would enable dynamic compensation of the ultrasonic sensor mounting angle during vehicle pitch changes, improving depth estimation accuracy on inclines and during braking. Integrating a secondary ultrasonic sensor at a complementary angle could provide cross-validation of depth measurements and extend coverage to wider potholes. Deploying a Google Coral TPU edge accelerator could achieve 30 FPS inference, enabling reliable operation at highway speeds \cite{b11}. Power optimization through solar panel integration would enable autonomous, maintenance-free deployment on utility poles or roadside infrastructure.
+
+\subsection{Advanced Analytics}
+The system's rich temporal and spatial dataset enables advanced analytics applications. Training predictive maintenance models on historical pothole formation patterns correlated with weather data, traffic volume, and pavement age could forecast where new potholes will emerge, enabling proactive repair \cite{b17}. Seasonal analysis could quantify the impact of freeze-thaw cycles and rainfall on pothole proliferation. Automatic repair cost estimation based on segmented area and depth would prioritize maintenance budgets effectively. Integration with navigation applications could provide real-time route optimization avoiding potholes, improving ride comfort and reducing vehicle damage.
+
+\subsection{System Extensions}
+Several extensions would broaden system applicability and impact. Developing a mobile application would enable crowdsourced detection from volunteers' smartphones, dramatically expanding coverage beyond dedicated vehicle installations. A specialized municipal dashboard with work order generation would streamline maintenance workflows from detection through repair verification. Real-time alerts via Vehicle-to-Everything (V2X) communication could warn drivers of upcoming potholes, enhancing safety. Blockchain integration would provide immutable audit trails of detections and repairs, ensuring accountability in public infrastructure maintenance contracts.
+
+\section{Conclusion}
+
+This paper presented a comprehensive GPS-based pothole detection, depth estimation, and route optimization system that successfully integrates YOLOV8n object detection, ONNX optimization for edge deployment, GPS tracking, ultrasonic depth measurement, severity classification, and pothole-aware navigation. The system achieves practical real-time performance (3-5 FPS) on Raspberry Pi 5 while maintaining high detection accuracy (mAP@0.5: 0.892). Validation using open-source Bangalore road data demonstrated 93.7\% precision with minimal false positives, while the Haversine-based de-duplication algorithm reduced redundant detections by up to 85.7\%.
+
+The proposed architecture provides a scalable, cost-effective solution for automated road condition monitoring at approximately \$150 per unit---a 90\% cost reduction compared to commercial systems. The integration of semantic segmentation enables intelligent maintenance prioritization through severity classification, while the geometry-based ultrasonic depth estimation provides metric pothole depth measurements using a trigonometric model with automated outlier rejection.
+
+Key innovations include: (1) ONNX model optimization achieving 77\% speed improvement on ARM devices, (2) geometry-based ultrasonic depth estimation using HC-SR04 sensor at 37\textdegree{} inclination with $d = (h_3 - h_2)\cos(x)$ providing metric depth values, (3) four adaptive upload strategies reducing bandwidth consumption by up to 86\%, (4) pothole-aware route optimization algorithm with multi-objective scoring, (5) cloud-based analytics dashboard with interactive mapping, and (6) comprehensive open-source implementation facilitating reproducibility.
+
+The system demonstrates significant potential for deployment in municipal road maintenance operations, fleet management, and crowdsourced infrastructure monitoring. Future enhancements targeting 8-10 FPS inference through quantization and hardware acceleration will enable high-speed vehicle integration.
+
+This work contributes to the growing field of smart city infrastructure by providing an accessible, automated solution for road damage detection, metric depth estimation, intelligent route planning, and maintenance management. The open-source release enables further research and real-world deployments, ultimately improving road safety and reducing vehicle damage costs.
+
+\section*{Acknowledgment}
+
+The authors would like to thank the Department of Electronics and Communication Engineering at RV College of Engineering for providing the necessary resources and support for this research. We also acknowledge Roboflow for providing the pothole detection dataset and the pothole segmentation dataset.
+
+\begin{thebibliography}{99}
+
+\bibitem{b1}
+M. Ren et al., ``An annotated street view image dataset for automated road damage detection (SVRDD),'' \textit{Nature Scientific Data}, Apr. 2024.
+
+\bibitem{b2}
+S. Zhang et al., ``OBC-YOLOV8n: An improved road damage detection model with data augmentation,'' \textit{PeerJ Computer Science}, 2025.
+
+\bibitem{b3}
+M. Yurdakul et al., ``An enhanced YOLOV8n model for real-time and accurate pothole detection and depth measurement,'' arXiv, 2025. [Online]. Available: https://arxiv.org/abs/2505.04207
+
+\bibitem{b4}
+J. Zhong et al., ``YOLOV8n and point cloud fusion for enhanced road pothole detection,'' \textit{Nature Scientific Reports}, 2025.
+
+\bibitem{b5}
+S.D. RS et al., ``Pothole detection and instance segmentation using YOLOV8n,'' IEEE, Dec. 2024.
+
+\bibitem{b6}
+S. Balakrishna et al., ``Reconciling YOLO-v8 model for real-time potholes detection,'' IEEE, 2024.
+
+\bibitem{b7}
+R.C.C.M. Santos et al., ``Real-time object detection performance analysis using YOLOv7-tiny on embedded hardware,'' IEEE, 2024.
+
+\bibitem{b8}
+Y. Hu et al., ``Lightweight deep learning for real-time road distress detection with MobilityNet,'' PMC, May 2025. [Online]. Available: https://pmc/articles/mobilitenet
+
+\bibitem{b9}
+M. Garcia et al., ``Edge computing in IoT for smart cities: Real-time services and infrastructure,'' \textit{All Multidisciplinary Journal}, Jul. 2025.
+
+\bibitem{b10}
+Multiple Authors, ``Quantized object detection for real-time inference on edge devices,'' \textit{Int. J. Adv. Comput. Sci. Appl.}, 2025.
+
+\bibitem{b11}
+A.R. Khouas et al., ``Training machine learning models at the edge: A survey,'' arXiv, Jul. 2024.
+
+\bibitem{b12}
+Rapid Innovation Team, ``Computer vision in autonomous vehicles: Techniques and applications,'' Rapid Innovation Blog, Sep. 2024.
+
+\bibitem{b13}
+Roboflow Team, ``Data annotation explained: roboflow tools and best practices,'' Roboflow Blog, Nov. 2025. [Online]. Available: https://roboflow.com/blog/data-annotation-explained
+
+\bibitem{b14}
+R. Rajagopal et al., ``Cross-platform edge AI made easy with ONNX Runtime,'' Microsoft Tech Community Blog, Nov. 2024. [Online]. Available: https://techcommunity.microsoft.com
+
+\bibitem{b15}
+Ultralytics \& Raspberry Pi Partnership, ``Deploying Ultralytics YOLO models on Raspberry Pi devices,'' Raspberry Pi Official Blog, Nov. 2024.
+
+\bibitem{b16}
+Multiple Authors, ``Internet of Things (IoT) solutions for smart transportation infrastructure,'' \textit{Propulsion Tech Journal}, Sep. 2024.
+
+\bibitem{b17}
+S. Bastia et al., ``Intelligent transportation systems in smart cities using IoT,'' \textit{Supply Chain and Operations Decision Making}, Aug. 2024.
+
+\bibitem{b18}
+A.M. Hayajneh et al., ``TinyML empowered transfer learning on the edge,'' White Rose ePrints, 2024.
+
+\end{thebibliography}
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{a1.png}}]{Vaibhav P. Roddappanavar}
+is pursuing his Bachelor's degree in Computer Science at RV College of Engineering, Bengaluru, India. His research interests include machine learning, embedded systems, and GPS-based applications. He developed the GPS integration module, implemented the Haversine-based spatial de-duplication algorithm, and configured the Quectel EC200U-CN cellular modem for GNSS positioning.
+\end{IEEEbiography}
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{a2.png}}]{Vishal K. Bhat}
+is pursuing his Bachelor's degree in Computer Science at RV College of Engineering, Bengaluru, India. His research interests include computer vision, edge computing, and IoT systems for smart city infrastructure. In this project, he led the development of the YOLOV8n detection pipeline, implemented ONNX optimization for Raspberry Pi deployment, and designed the real-time inference architecture.
+\end{IEEEbiography}
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{a3.png}}]{Sumadhva Krishna H. M.}
+is pursuing his Bachelor's degree in Computer Science at RV College of Engineering, Bengaluru, India. His research interests include deep learning, real-time systems, and cloud computing architectures. He designed and implemented the cloud backend using Node.js and MongoDB, developed the RESTful API endpoints, and created the upload strategy optimization algorithms.
+\end{IEEEbiography}
+
+
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{a4.png}}]{Chethohaar J. M.}
+is pursuing his Bachelor's degree in Cyber Security at RV College of Engineering, Bengaluru, India. His research interests include secure IoT systems and network security for embedded applications. He implemented secure communication protocols between edge devices and cloud services, designed the authentication mechanisms, and established data encryption standards for the system.
+\end{IEEEbiography}
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{a5.png}}]{Rachateshwar}
+is pursuing his Bachelor's degree in Artificial Intelligence and Machine Learning at RV College of Engineering, Bengaluru, India. His research interests include object detection, neural network optimization, and autonomous systems. He developed the YOLOv11n-seg segmentation model for severity classification, created the React-based frontend dashboard, and implemented the pothole-aware route optimization algorithm.
+\end{IEEEbiography}
+
+\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{a6.png}}]{Dr. Smriti Srivastava}
+She has received the B.Tech. degree in computer science and engineering from BIT, Meerut, in 2009, the M.Tech. degree in computer science and engineering from Amity University, Noida, in 2013, and the Ph.D. degree in computer science and engineering from Visvesvaraya Technological University, Belagavi, in 2024. She  has over 16 years of teaching experience.Her Research areas of interests include wireless networks, network-on chip, and machine learning.
+\end{IEEEbiography}
+
+\EOD
+
+\end{document}

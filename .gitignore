@@ -12,3 +12,5 @@ __pycache__
 /phase_6_evaluation/yolo
 *.mp4
 /IDP Paper
+.DS_Store
+/phase_0_baseline/output/logs.csv
