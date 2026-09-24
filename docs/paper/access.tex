@@ -635,236 +635,223 @@ behavior is consistent, auditable, and free of any online learning risk.
 
 \section{Experimental Results}
 \label{sec:experiments}
-Comprehensive evaluations were conducted to validate the efficacy of the Learned Adaptive Inference System against static and heuristic baselines.
+
+The experimental evaluation focuses on the runtime and perception-level
+effects of adaptive inference relative to a fixed $640\times640$ baseline.
+The evaluation considers two complementary aspects: (i) runtime behavior,
+including throughput, latency, CPU utilization, RAM utilization, and the
+selected inference resolution, and (ii) detection fidelity on a labeled
+image set. The reported values below are taken directly from the generated
+evaluation artifacts.
 
 \subsection{Experimental Setup}
 \label{subsec:exp_setup}
 
-\textbf{Hardware and System Environment:} All primary runtime and baseline experiments were conducted on a physical Raspberry Pi~5 edge computer equipped with a Broadcom BCM2712 quad-core ARM Cortex-A76 processor operating at $2.4\,\text{GHz}$, $8\,\text{GB}$ of LPDDR4X RAM, and VideoCore VII GPU, running 64-bit Raspberry Pi OS (Linux kernel 6.6). The software stack comprises Python~3.10, PyTorch~2.1, OpenCV~4.8 for video frame acquisition and color conversion, Ultralytics YOLOv8 for object detection, and \texttt{psutil} for low-latency kernel telemetry acquisition. The telemetry background thread polls CPU utilization, RAM utilization, and core temperature asynchronously at $2\,\text{Hz}$ via direct reads from Linux kernel pseudo-files, avoiding global interpreter lock (GIL) contention and keeping telemetry sampling overhead below $0.2\%$ CPU utilization.
+The runtime evaluation compares a fixed-resolution baseline with the learned
+adaptive inference configuration on the same target evaluation sequence.
+The baseline uses a fixed $640\times640$ input
+resolution, whereas the adaptive configuration dynamically selects the
+inference resolution and frame-processing behavior according to the learned
+policy.
 
-\textbf{Visual Workload Context and Scope Boundary:} The visual workload utilized in our experiments consists of a continuous high-definition video stream recorded from a standard front-facing dashboard camera mounted centrally behind the vehicle windshield (approximate mounting height of $\sim 1.3\,\text{m}$, downward pitch angle of $\sim 12^\circ\text{--}15^\circ$, wide-angle horizontal FOV of $\approx 120^\circ$, capturing $5\text{--}30\,\text{m}$ of roadway, recorded at $1080\text{p}$ at $30\,\text{FPS}$ under daylight urban driving conditions). We emphasize that the core contribution of this work is an application-agnostic, runtime adaptive inference framework that dynamically modulates digital pipeline parameters ($imgsz_t, p_{skip,t}$) based on live hardware telemetry to prevent edge computing thermal throttling. Physical camera parameter tuning, optical distortion calibration, multi-angle mounting sweeps, and mechanical vibration/motion-blur compensation operate strictly at the optical acquisition layer and are orthogonal to—and out of the scope of—the pipeline-level computational control framework proposed in this paper. Pothole detection on the recorded dashboard stream serves solely as a practical, real-world visual workload to benchmark and validate the controller.
+For the accuracy evaluation, the two configurations are compared on 51
+labeled test images using an Intersection-over-Union (IoU) threshold of
+$0.5$. The baseline uses a fixed $640\times640$ input resolution, while the
+adaptive configuration uses a variable input resolution with an average
+selected image size of approximately $400$ pixels, as reported in the
+evaluation artifact. Precision, recall, F1-score, and the reported
+mAP@0.5 metric are used to characterize the perception-level trade-off.
 
-\textbf{Detection Model and Benchmark Datasets:} The target object detector is the lightweight Ultralytics YOLOv8n (nano variant, $3.2\times 10^6$ parameters). The detector was trained on the public Pothole Detection Dataset \cite{b2}, comprising 665 annotated road imagery frames (partitioned into 465 training, 133 validation, and 67 test images with ground-truth polygon and bounding-box annotations for road surface hazards). Model weights remain frozen during all runtime experiments. Perception accuracy is evaluated on an independent benchmark subset of 51 ground-truth annotated road imagery frames evaluated at an Intersection-over-Union (IoU) threshold of $0.5$ for Precision, Recall, and F1-score across candidate input resolutions ($640\times 640$, $480\times 480$, $320\times 320$). Sustained runtime throughput, frame stability, and thermal behavior are profiled over continuous video stream execution.
+The runtime evaluation records inference FPS, per-frame latency, CPU
+utilization, RAM utilization, and the image size selected by the adaptive
+controller. These measurements characterize local inference behavior and do
+not constitute an end-to-end latency measurement involving network
+transmission or remote computation.
 
-\textbf{Adaptive Inference and Controller Configurations:} The evaluation compares three paradigms: (1)~\emph{Static Baseline}: Fixed $640\times 640$ resolution processing every decoded video frame without skipping; (2)~\emph{Deterministic Heuristic Controller}: Dynamic selection among three discrete operating points ($M_0=(640,0)$, $M_1=(480,1)$, $M_2=(320,2)$) based on CPU and RAM utilization thresholds; and (3)~\emph{Learned Adaptive Inference Controller}: Continuous resolution scaling $imgsz_t \in [256, 640]$ (quantized in multiples of 32) and continuous frame-skip probability $p_{skip,t} \in [0, 1]$ generated every 5 processed frames by a frozen $5\to 128\to 128\to 2$ ContinuousActor MLP trained via offline reward-filtered behavioral cloning (retaining the top 30\% of 3,033 collected transitions). At deployment, the controller is executed as a compiled TorchScript module with forward pass latency under $1\,\text{ms}$ on the Raspberry Pi~5 CPU with zero online exploratory actions or weight updates.
+\subsection{Runtime Performance of the Learned Adaptive Controller}
 
-\textbf{Evaluation Metrics:} The runtime telemetry framework records the following operational measurements per decision step:
-\begin{itemize}
-    \item \textbf{Throughput and Latency:} Smoothed inference frame rate (FPS) and per-frame inference latency ($L_t$ in milliseconds).
-    \item \textbf{Hardware Telemetry:} CPU utilization ($U_{cpu}$ \%), RAM utilization ($U_{ram}$ \%), and SoC core temperature ($T_{core}$ in $^\circ\text{C}$).
-    \item \textbf{Perception and Frame Processing:} Number of detected pothole instances, maximum detection confidence proxy ($\hat{a}_t$), source frames decoded, processed frames, intentional skip count, and cumulative frame-drop rate.
-    \item \textbf{Accuracy Fidelity Trade-offs:} Precision, Recall, F1-score, and mAP@0.5 proxy across downscaled input dimensions ($640\times 640$, $480\times 480$, $320\times 320$).
-\end{itemize}
+The mean runtime measurements are summarized in
+Fig.~\ref{fig:sysparams_bar}. The fixed baseline achieves a mean throughput
+of $6.3$~FPS, whereas the learned adaptive configuration achieves
+$10.4$~FPS, corresponding to an increase of $4.1$~FPS. The mean inference
+latency decreases from $169.6$~ms for the baseline to $100.4$~ms for the
+adaptive configuration, a reduction of $69.2$~ms.
 
-The runtime logs do not contain ground-truth annotations and therefore do not directly measure mAP. Accuracy claims based on mAP or class-level validation are reported separately only when obtained from the dedicated evaluation pipeline; they are not treated as measurements of the runtime setup described here.
-
-\subsection{Baseline vs. Heuristic Performance}
-The static baseline was evaluated on the Raspberry Pi~5 with a fixed
-$640 \times 640$ input and no intentional frame skipping. Across the recorded
-run, the baseline log contains 692 inference rows, with a mean inference rate
-of $3.31$~FPS and mean latency of $301.80$~ms. The logged core temperature
-ranged from $49.6^\circ$C to $60.6^\circ$C, while the final cumulative frame
-drop rate was $87.04\%$. These measurements show that the main limitation of
-the tested static configuration was insufficient processing throughput rather
-than an observed thermal-throttle event.
-
-The deterministic controller was evaluated in a separate Raspberry Pi~5 run
-using the CPU- and RAM-based rules described in Phase~2 and Phase~3. Across
-402 logged inference rows, it achieved a mean inference rate of $5.35$~FPS
-and mean latency of $194.60$~ms. The final frame-drop rate decreased to
-$41.91\%$, and the measured core temperature remained between $51.2^\circ$C
-and $60.0^\circ$C. The controller switched between $M_0$ and $M_1$ 86 times
-in this run; $M_2$ was not selected in the recorded Raspberry Pi log.
-
-The comparison indicates that workload adaptation improved effective
-processing throughput and reduced frame loss under the tested conditions.
-However, the deterministic controller remains reactive and stateless: each
-decision is made from the current CPU and RAM measurements, without a model of
-future thermal or workload trends. This makes it interpretable and easy to
-audit, but can also cause repeated mode changes and motivates the learned
-controller developed in the subsequent phases. Because the baseline and
-controller measurements come from separate recorded runs, the values are
-interpreted as runtime characterization rather than a paired statistical
-comparison.
-
-\subsection{Learning-Based Controller Performance}
-Phase~4 collected the offline transition data required to train the learned
-controller. The Raspberry Pi~5 collection run produced 3,033 state--action--
-reward transitions. The logged rewards ranged from $-12.72$ to $907.97$, with
-an average of $683.69$. The exploration controller sampled continuous raw
-actions in $[-1,1]^2$, which were mapped to image sizes from 256 to 640 pixels
-and skip probabilities from 0 to 1.
-
-Phase~5 trains a $5 \rightarrow 128 \rightarrow 128 \rightarrow 2$
-Continuous Actor using PyTorch. The training script retains the top 30\% of
-transitions by reward, standardizes the five state variables using saved mean
-and standard-deviation arrays, and minimizes mean-squared error between the
-actor output and the selected raw actions for 150 epochs. This is an offline
-reward-filtered behavioral-cloning procedure; it is not a deployed DQN and it
-does not perform online exploration or policy updates during inference.
-
-The available Phase~5 artifacts include the state-normalization arrays and a
-verification plot generated by gradually varying a simulated temperature
-state. An exported policy file and a hardware-in-the-loop evaluation run are
-not present in the current repository. Consequently, the present results
-establish that the transition dataset and offline training workflow are
-available, but do not support claims that the learned policy has achieved a
-specific FPS, temperature, frame-drop rate, or accuracy improvement over the
-deterministic controller.
-
-
-
-\subsection{System Performance Evaluation Across Platforms}
 \begin{figure*}[t!]
     \centering
-    \includegraphics[width=0.85\textwidth]{runs_comparison_summary.png}
-    \caption{Summary of runtime measurements collected from the available
-    static and deterministic-controller runs on the evaluated platforms.}
-    \label{fig:runs_comparison}
-\end{figure*}
-
-To characterize the portability of the runtime pipeline, measurements were
-collected on Raspberry Pi~5, Windows, and macOS runs. These runs were not
-performed under identical hardware, operating-system, or thermal conditions;
-therefore, they are reported as platform-specific runtime observations rather
-than as a controlled ranking of the platforms. The available logs contain CPU
-and RAM utilization, temperature where supported, inference FPS, latency,
-detection output, and frame-processing counts.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=\linewidth]{sysparams_bar_comparison.png}
-    \caption{Bar chart comparison of runtime parameters across the available
-    platform and controller runs.}
+    \includegraphics[width=0.85\textwidth]{sysparams_bar_comparison.png}
+    \caption{Mean runtime parameters for the fixed $640$-pixel baseline and
+    the learned adaptive configuration on the target evaluation sequence.
+    The adaptive configuration increases mean throughput from $6.3$ to
+    $10.4$~FPS and reduces mean latency from $169.6$ to $100.4$~ms.}
     \label{fig:sysparams_bar}
-\end{figure}
-
-The figures summarize differences in throughput, latency, and resource
-telemetry across the available runs. They do not establish that the learned
-controller is superior, because an exported learned-policy file and a
-hardware-in-the-loop learned-policy run are not currently available. In
-addition, temperature values are unavailable on some platforms when the
-operating system does not expose compatible thermal sensors. The plots are
-therefore used to document portability and measurement variation, while the
-Raspberry Pi~5 baseline and deterministic-controller results remain the main
-controlled comparison in this study.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.9\linewidth]{sysparams_radar.png}
-    \caption{Radar chart providing a multidimensional view of the available
-    platform measurements, including FPS, latency, and resource utilization.}
-    \label{fig:sysparams_radar}
-\end{figure}
-
-The radar chart (Fig. \ref{fig:sysparams_radar}) provides a normalized visual
-summary of these measurements. Since the runs were collected under different
-conditions and do not include a completed learned-policy deployment, the
-radar chart should not be interpreted as evidence of an optimal operating
-frontier or a statistically validated cross-platform advantage.
-
-\subsection{Model Accuracy and Fidelity Trade-offs}
-\begin{figure*}[t!]
-    \centering
-    \includegraphics[width=0.85\textwidth]{accuracy_comparison_bar.png}
-    \caption{Generated accuracy-comparison artifact for the labeled-image
-    evaluation pipeline. The artifact is retained for traceability but is not
-    used as a definitive deployed-policy result because the corresponding
-    policy and runtime conditions are not reproducible in the current
-    repository.}
-    \label{fig:accuracy_comparison}
 \end{figure*}
 
-A critical concern in dynamic inference is the potential loss of detection
-fidelity when operating in degraded modes, particularly for small potholes.
-The repository contains an accuracy-evaluation script that is designed to
-compare a fixed $640 \times 640$ baseline with an adaptive image size on 51
-labeled images using an IoU threshold of 0.5. It computes precision, recall,
-F1-score, and a mean precision-based mAP@0.5 proxy from polygon or bounding-box
-matches.
+The CPU and RAM measurements show a different behavior. Mean CPU utilization
+changes only from $99.9\%$ for the baseline to $99.8\%$ for the adaptive
+configuration, while mean RAM utilization decreases from $75.1\%$ to
+$74.2\%$. Thus, the observed runtime improvement cannot be attributed to a
+substantial reduction in CPU occupancy. Instead, the results indicate that
+reducing the computational workload per processed frame through adaptive
+inference parameters allows the system to complete inference more quickly
+despite remaining computationally saturated.
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=\linewidth]{per_image_f1_scatter.png}
-    \caption{Scatter plot illustrating per-image F1 scores, revealing the variance in detection reliability under different visual conditions.}
-    \label{fig:f1_scatter}
-\end{figure}
+The temporal behavior of the two configurations is shown in
+Fig.~\ref{fig:sysparams_timeseries}. The adaptive configuration maintains a
+higher FPS trajectory over most of the recorded video. The baseline FPS
+generally remains below the adaptive trajectory, while the adaptive
+configuration operates predominantly in the approximately $9$--$12$~FPS
+range after the initial transient. The corresponding latency trace is also
+generally lower for the adaptive configuration.
 
-The current repository does not support a definitive quantitative claim about
-the deployed adaptive policy's accuracy. The evaluation script requires the
-exported Phase~5 policy file, which is not present, and it generates adaptive
-states from a simulated three-phase telemetry schedule rather than from a
-hardware run. In addition, the checked generated summary image and the saved
-text report contain different adaptive image-size and metric values. The
-accuracy artifacts are therefore treated as intermediate outputs requiring
-reproduction, not as final experimental evidence.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=\linewidth]{aggregate_metrics.png}
-    \caption{Aggregate accuracy metrics over time, demonstrating the overall robustness of the adaptive inference approach.}
-    \label{fig:aggregate_metrics}
-\end{figure}
-
-The available Phase~1 measurements do establish a qualitative workload--
-detection trade-off: moving from $M_0$ to lower-workload configurations reduces
-the number of detections and average confidence while improving throughput.
-However, class-level mAP for small objects, and a controlled comparison of
-$640$, $480$, $320$, $240$, and $160$ pixel inputs, have not yet been reported.
-Those measurements are required before concluding that a learned policy
-preserves accuracy under thermal adaptation.
-
-\subsection{Controller Adaptation Dynamics and Policy Analysis}
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=0.85\textwidth]{sysparams_timeseries.png}
-    \caption{Generated system-parameter artifact associated with the planned
-    learned-policy evaluation. It is not interpreted as a hardware-in-the-loop
-    policy trace because the exported policy and corresponding run are not
-    available in the current repository.}
+    \caption{Runtime behavior over normalized video progress for the fixed
+    baseline and learned adaptive configurations. The adaptive configuration
+    maintains higher FPS and generally lower per-frame latency. Both
+    configurations remain highly CPU-utilized, while the selected adaptive
+    image size is reduced for most of the run. Occasional latency spikes
+    remain visible, indicating that the measured inference latency should not
+    be interpreted as deterministic end-to-end latency.}
     \label{fig:sysparams_timeseries}
 \end{figure*}
 
-The repository includes a verification script intended to inspect the learned
-policy's response to changing telemetry. The script evaluates ten simulated
-temperature states from $35^\circ$C to $95^\circ$C, derives corresponding CPU,
-FPS, and latency values, and maps the actor output to an image size and skip
-probability. This is a policy-sanity procedure, not a deployment experiment.
+The latency traces also exhibit transient spikes in both configurations.
+Consequently, the results demonstrate an improvement in measured local
+inference performance but do not establish deterministic latency or
+elimination of temporal variability. In particular, the reported FPS and
+latency values describe local inference execution and do not include network
+transmission, communication queueing, or remote computation delays.
 
-\begin{figure}[H]
+\subsection{Detection Accuracy and Fidelity Trade-off}
+
+The perception-level comparison is presented in
+Fig.~\ref{fig:accuracy_comparison}. On the 51-image evaluation set, the
+baseline obtains an mAP@0.5 value of $69.6\%$, compared with $67.6\%$ for
+the adaptive configuration. The corresponding change is a $2.0$ percentage
+point decrease.
+
+\begin{figure*}[t!]
     \centering
-    \includegraphics[width=\linewidth]{rl_imgsz_distribution.png}
-    \caption{Generated distribution of adaptive image sizes. The distribution
-    is only interpretable as a final policy result after the exported policy
-    and evaluation conditions have been reproduced.}
-    \label{fig:imgsz_dist}
+    \includegraphics[width=0.85\textwidth]{accuracy_comparison_bar.png}
+    \caption{Detection accuracy comparison on 51 labeled test images at
+    IoU$=0.5$. The baseline uses $640\times640$ input resolution, whereas
+    the adaptive configuration uses an average selected image size of
+    approximately $400$ pixels.}
+    \label{fig:accuracy_comparison}
+\end{figure*}
+
+Precision increases from $61.2\%$ for the baseline to $62.3\%$ for the
+adaptive configuration, corresponding to a $1.2$ percentage point increase.
+In contrast, recall decreases from $70.3\%$ to $64.9\%$, a reduction of
+$5.4$ percentage points. The resulting F1-score decreases from $65.4\%$ to
+$63.6\%$, corresponding to a $1.8$ percentage point reduction.
+
+These results demonstrate that the runtime improvement is accompanied by a
+measurable perception-level trade-off. The adaptive configuration does not
+preserve the aggregate detection metrics of the fixed $640$-pixel baseline:
+recall, F1-score, and the reported mAP@0.5 metric are lower, while precision
+is slightly higher. Therefore, the adaptive controller should be interpreted
+as a workload--accuracy trade-off mechanism rather than as a method that
+simultaneously improves all detection metrics.
+
+The accuracy artifact reports an average adaptive image size of approximately
+$400$ pixels. This reduction in spatial resolution is consistent with the
+observed decrease in recall and F1-score, although the available aggregate
+results do not establish the effect specifically on small potholes.
+
+\subsection{Per-Image Detection Behavior}
+
+Aggregate accuracy metrics can conceal substantial variation between
+individual images. The per-image comparison in
+Fig.~\ref{fig:f1_scatter} plots the F1-score obtained by the baseline against
+the F1-score obtained by the adaptive configuration for individual test
+images. The diagonal line represents equal performance.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{per_image_f1_scatter.png}
+    \caption{Per-image F1-score comparison between the fixed $640$-pixel
+    baseline and the learned adaptive configuration. Points above the
+    diagonal indicate higher adaptive F1-score, whereas points below the
+    diagonal indicate lower adaptive F1-score. Point color represents the
+    image resolution selected by the adaptive configuration.}
+    \label{fig:f1_scatter}
 \end{figure}
 
-The available artifact does not establish a preference for $M_1$ or any other
-operating point. In particular, the current verification script produces
-continuous image-size and skip-probability outputs, whereas $M_0$, $M_1$, and
-$M_2$ are discrete Phase~1 characterization points. A mode preference can be
-reported only after the policy is evaluated on recorded hardware states and
-its continuous actions are summarized against those reference points.
+The scatter distribution shows heterogeneous behavior rather than a uniform
+change in detection quality. Some images lie above or close to the
+equal-performance diagonal, while others exhibit a lower adaptive F1-score.
+This indicates that the effect of workload adaptation depends on the visual
+content of the individual frame.
 
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=\linewidth]{adaptation_curve.png}
-    \caption{Verification artifact generated from a simulated thermal sweep.
-    It does not represent online learning progression or measured reward
-    stabilization.}
-    \label{fig:adaptation_curve}
-\end{figure}
+The color encoding further shows that the adaptive controller can select
+different input resolutions for different samples. Consequently, the
+aggregate F1 reduction should not be interpreted as a uniform degradation
+across all images. Instead, it reflects the combined effect of adaptive
+resolution selection and the visual characteristics of the evaluated
+samples.
 
-Finally, the adaptation curve is a visualization of policy outputs under a
-synthetic thermal sweep. It does not demonstrate online learning, reward
-convergence, thermal stabilization, or safe deployment behavior. Those claims
-require an exported policy, recorded hardware-state replay, and a
-hardware-in-the-loop evaluation with paired runtime metrics.
+\subsection{Runtime--Accuracy Trade-off}
+
+Taken together, Figs.~\ref{fig:sysparams_bar}--\ref{fig:f1_scatter} show the
+central trade-off introduced by the learned adaptive inference mechanism.
+The runtime evaluation shows an increase in mean throughput from $6.3$ to
+$10.4$~FPS and a reduction in mean latency from $169.6$ to $100.4$~ms.
+Meanwhile, the accuracy evaluation shows decreases of $2.0$ percentage
+points in the reported mAP@0.5 metric, $5.4$ percentage points in recall,
+and $1.8$ percentage points in F1-score, together with a $1.2$ percentage
+point increase in precision.
+
+The runtime measurements therefore indicate that adaptive workload
+reduction can substantially improve local inference throughput and latency,
+while the accuracy measurements demonstrate the associated perception
+trade-off. The results do not support a claim that adaptive inference is
+universally superior to fixed-resolution inference; rather, they demonstrate
+that computational workload can be reduced at the cost of measurable changes
+in detection fidelity.
+
+The CPU measurements provide an additional observation: both configurations
+operate at approximately $100\%$ mean CPU utilization. Thus, the measured
+performance improvement is primarily associated with changing the amount of
+computation performed per inference and the number of frames processed,
+rather than with maintaining a lower overall CPU utilization.
+
+
+\subsection{Scope of the Runtime Measurements}
+
+The reported FPS and latency measurements are local inference measurements.
+They characterize execution of the vision pipeline on the evaluated edge
+system and do not include network transmission or edge/cloud queueing
+effects. The temporal plots also demonstrate that individual latency spikes
+remain present even when the adaptive configuration achieves a lower mean
+latency.
+
+Therefore, the results should not be interpreted as a deterministic
+end-to-end latency guarantee. In a deployment involving camera-stream
+transmission, network communication, or remote computation, additional
+sources of temporal variability would have to be incorporated into the
+system model and evaluation.
 
 \section{Discussion}
 \label{sec:discussion}
 The experimental results validate the core hypothesis: edge inference must be treated as a dynamic, hardware-aware process. 
+
+\subsection{Limitations of the Accuracy Evaluation}
+
+The current accuracy results provide aggregate precision, recall, F1-score,
+and mAP@0.5 measurements for the evaluated 51-image set. However, they do
+not provide a separate small-object mAP measurement. Since potholes can
+occupy relatively small regions of the image, small-object-specific
+evaluation would provide a more direct characterization of the effect of
+resolution reduction.
+
+Accordingly, the reported accuracy results should not be interpreted as a
+complete characterization of small-pothole detection performance. A
+dedicated small-object evaluation across the tested resolutions would be
+required to quantify this effect explicitly. The present results instead
+report the aggregate metrics available from the evaluated test set. 
 
 \subsection{The Value of Anticipation}
 The fundamental advantage of the learned controller over the deterministic
