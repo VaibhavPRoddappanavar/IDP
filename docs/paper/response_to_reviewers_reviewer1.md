@@ -48,18 +48,18 @@ We have updated the manuscript as follows:
 *There should be discussion on camera placement such as camera angle, camera height and camera field of view so that the proposed method can make sense. (Additional Question 2: how they coped with motion blur).*
 
 **Author response:**  
-We completely agree with the reviewer that camera placement and acquisition geometry are crucial for interpreting road-inspection vision systems. Camera height, pitch angle, and field of view directly dictate the visible road surface area, perspective distortion, and the scale (pixel footprint) of potholes across distance. Furthermore, vehicle velocity and camera shutter speed determine motion blur characteristics.
+We thank the reviewer for raising this point. We clarify that physical camera calibration, multi-angle mounting sweeps, variable mounting heights, optical distortion modeling, and vehicular motion-blur dynamics are **outside the scope** of this work. 
 
-In the revised manuscript, we have added comprehensive camera and acquisition specifications to **Section V-A (Experimental Setup)**:
-- **Mounting Position & Height:** Front-facing dashboard camera mounted centrally behind the vehicle's front windshield at an approximate height of $1.3\,\text{m}$ ($1.2\text{--}1.5\,\text{m}$ operational range) above the road surface.
-- **Pitch Angle:** Downward pitch angle of approximately $12^\circ\text{--}15^\circ$ toward the roadway horizon.
-- **Field of View (FOV):** Wide-angle lens with a horizontal FOV of $\approx 120^\circ$, providing complete coverage of the active travel lane and adjacent road shoulders.
-- **Visible Road Surface:** Captures the asphalt surface spanning $5\text{--}30\,\text{m}$ in front of the vehicle. Potholes in the near-to-mid field ($5\text{--}15\,\text{m}$) occupy sufficient spatial resolution even under downscaled input dimensions ($480\times 480$), whereas potholes at the far horizon ($>20\,\text{m}$) become small-scale targets sensitive to aggressive downscaling ($320\times 320$).
-- **Video Format & Motion Blur Handling:** 1080p Full HD ($1920\times 1080$ at 30 FPS, H.264 MP4). Under typical urban inspection speeds ($30\text{--}50\,\text{km/h}$), daylight auto-exposure maintains fast shutter speeds ($\ge 1/500\,\text{s}$), preventing severe motion blur. We also explicitly discuss the impact of high-speed motion blur and frame skipping as an operational limitation and designate multi-camera geometry and speed-dependent ablation studies as future research directions.
+The primary contribution of this paper is a general, model-agnostic, runtime **adaptive inference system** that prevents edge computing thermal throttling and resource saturation by dynamically modulating digital pipeline parameters (input resolution $imgsz_t$ and frame-skip probability $p_{skip,t}$) using live hardware telemetry ($U_{cpu}, U_{ram}, T_{core}, FPS_{avg}, L_t$). Pothole detection on a dashboard camera stream serves strictly as an illustrative application and benchmarking workload to evaluate the controller under sustained visual processing demand. The controller operates purely at the digital pipeline layer and does not interact with, calibrate against, or actuate physical camera hardware.
+
+However, to ensure full transparency and provide readers with the necessary operational context of the evaluation workload, we have added the visual acquisition parameters of the evaluated dashboard-camera footage to **Section V-A (Experimental Setup)**:
+- **Workload Context:** Front-facing dashboard camera mounted centrally behind the vehicle windshield at an approximate height of $\sim 1.3\,\text{m}$ ($1.2\text{--}1.5\,\text{m}$ operational range) above the road surface, with a downward pitch angle of $\sim 12^\circ\text{--}15^\circ$ toward the roadway horizon, and a wide-angle lens with a horizontal Field of View (FOV) of $\approx 120^\circ$ capturing $5\text{--}30\,\text{m}$ of roadway ahead.
+- **Acquisition & Motion Blur Context:** Continuous $1080\text{p}$ video ($1920\times 1080$ at $30\,\text{FPS}$, H.264 MP4) recorded during daylight urban driving ($30\text{--}50\,\text{km/h}$), where daylight auto-exposure maintains fast shutter speeds ($\ge 1/500\,\text{s}$) to avoid severe motion blur under standard driving speeds.
+- **Scope Boundary:** Section V-A and Section VII explicitly delineate that optical sensor calibration, variable physical mounting angle studies, and mechanical vibration/blur modeling belong to physical sensor engineering and are designated as out of scope of our pipeline-level adaptive inference framework.
 
 **Author action:**  
-1. Updated **Section V-A (Experimental Setup)** under the paragraph *“Camera Setup, Geometry, and Video Acquisition”* detailing exact camera height ($1.3\,\text{m}$), pitch angle ($12^\circ\text{--}15^\circ$), horizontal FOV ($120^\circ$), visible range ($5\text{--}30\,\text{m}$), 1080p @ 30 FPS video acquisition, and daylight shutter speed motion blur mitigation.
-2. Updated **Section VII (Discussion)** under *“State Design and Future Context-Aware Extensions”* and *“Future Research Directions”* to explicitly characterize camera geometry dependencies, vehicle speed integration, and high-speed motion-blur evaluations.
+1. Updated **Section V-A (Experimental Setup)** under *“Visual Workload Context and Scope Boundary”* to formally document the recording parameters of the dashboard test stream while explicitly defining physical camera calibration, multi-geometry sweeps, and optical distortion modeling as out of scope.
+2. Updated **Section VII (Discussion)** under *“State Design and Future Context-Aware Extensions”* and *“Future Research Directions”* to reinforce that the scope of this study is pipeline-level computational and thermal adaptation, positioning sensor-level optical calibration and vehicle-speed context as orthogonal future extensions.
 
 ---
 
@@ -121,7 +121,7 @@ We updated the entire manuscript across Sections I, II, III, IV, V, and VII to e
 
 **Question 2: Is the paper technically sound?**  
 *Reviewer comment: Yes, the paper is technically sound, however, the authors should justify why they chose such a method by discussing camera angle, camera field of view, camera height relative to the road surface, and how they coped with motion blur.*  
-**Author response & action:** As detailed under Concern 2, we added complete camera geometry specifications (mounting height $1.3\,\text{m}$, downward pitch $12^\circ\text{--}15^\circ$, FOV $120^\circ$, road surface $5\text{--}30\,\text{m}$, daylight exposure for motion blur mitigation) to Section V-A.
+**Author response & action:** As detailed under Concern 2, we clarified that physical camera calibration, variable mounting sweeps, and vehicle-dynamics motion-blur modeling are outside the scope of our pipeline-level adaptive system. We provided the contextual recording parameters of the dashboard-camera stream used as the evaluation workload in Section V-A and explicitly documented the scope boundary in Section V-A and Section VII.
 
 **Question 3: Is the subject matter presented in a comprehensive manner?**  
 *Reviewer comment: Yes, the subject matter is presented in a comprehensive manner, however, more references and justification over the design is required.*  
