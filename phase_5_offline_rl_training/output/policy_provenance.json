@@ -1,0 +1,18 @@
+{
+  "trained_at": "2026-10-28T05:40:59.237603+00:00",
+  "dataset_path": "/Users/vishalbhat/RVCE/SEM 6/IDP project/IDP/phase_4_rl_data_collection/output/rl_transitions_rpi_1.parquet",
+  "dataset_sha256": "d8250595f161e6c42f0ae729c0315a76dc1defd1d994a3fe0f986c4d338964c5",
+  "dataset_rows_total": 3033,
+  "rows_used": 910,
+  "top_pct": 30.0,
+  "reward_weights": {
+    "w_acc": 10.0,
+    "w_fps": 0.5,
+    "w_lat": 0.1
+  },
+  "architecture": "5 -> 128 -> 128 -> 2 (ReLU, Tanh)",
+  "optimizer": "Adam lr=1e-3, MSE, batch=64, epochs=150",
+  "seed": 0,
+  "final_train_mse": 0.19488932490348815,
+  "policy_sha256": "427f5f63c064dd8ed59855ced819319be76e7f454bb0dff7789ff306f21cc706"
+}
