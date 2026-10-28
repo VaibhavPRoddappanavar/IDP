@@ -50,13 +50,19 @@
 \corresp{Corresponding author: Rajeswara Rao K V S (e-mail: rajeswararaokvs@rvce.edu.in).}
 
 \begin{abstract}
+\hl{%
 Deploying object detection on resource-constrained edge hardware requires balancing detection workload against available computation and thermal headroom. This paper presents a modular adaptive-inference study for YOLOv8n, using CPU utilization, RAM consumption, core temperature, frame rate, and latency as telemetry signals. The system contains fixed operating points, a reactive heuristic controller, and an offline reward-filtered behavioral-cloning policy whose parameters are frozen before inference. The Raspberry Pi~5 measurements establish the runtime trade-off between fixed input resolutions and frame skipping; the learned-policy analyses are reported separately because the available policy evaluation uses recorded or simulated states rather than a completed sustained hardware-in-the-loop deployment.
+}%
 
+\hl{%
 In the recorded Raspberry Pi~5 runs, fixed $640\times640$ inference achieved approximately $3.31$ processed FPS, while the deterministic operating-point experiments reached higher processed throughput at lower resolutions with an explicit reduction in source-frame coverage. The offline dataset contains 3,033 transitions, and the exported policy is versioned with dataset and training provenance. Accuracy results are treated as a resolution-dependent trade-off and are not interpreted as evidence of standard mAP improvement or thermal-throttling prevention. This separation between measured hardware behavior and offline policy analysis provides a reproducible basis for future closed-loop validation without claiming unperformed experiments.
+}%
 \end{abstract}
 
 \begin{keywords}
+\hl{%
 Adaptive Inference, YOLOv8, Edge Computing, Offline Behavioral Cloning, Thermal Management, Pothole Detection, Raspberry Pi, Dynamic Resolution Scaling, Frame Skipping, Telemetry-Driven Control, Resource-Constrained Inference, IoT Edge Deployment.
+}%
 \end{keywords}
 
 \titlepgskip=-15pt
@@ -76,8 +82,8 @@ Current deployment strategies generally treat inference pipelines as static conf
 
 The static paradigm assumes that the edge device can consistently dissipate heat and sustain peak processing speeds. However, when thermal throttling occurs, the software continues demanding a fixed computational workload while the hardware's available computational capacity diminishes. This mismatch can result in reduced frame rates, increased latency, missed detections, and, in the worst case, system failure. A robust edge AI system must monitor its operational state and dynamically adjust its computational demands to preserve overall stability and responsiveness.
 
-\begin{highlight}
 \subsection{Proposed Solution: Adaptive Inference}
+\begin{highlight}
 To address these challenges, an adaptive YOLOv8 inference system is introduced. The system exposes two tunable control parameters at runtime: the input resolution $imgsz \in [256, 640]$ (constrained to multiples of 32) and the frame-skip probability $p_{skip} \in [0, 1]$, which determines the proportion of incoming frames that bypass the forward pass entirely. Together, these parameters define a workload-control space for studying trade-offs between detection fidelity and computational demand.
 \end{highlight}
 
@@ -683,9 +689,7 @@ controller. These measurements characterize local inference behavior and do
 not constitute an end-to-end latency measurement involving network
 transmission or remote computation.
 
-\begin{highlight}
 \subsection{Runtime Performance of the Measured Operating Points}
-\end{highlight}
 
 \begin{highlight}
 The previously reported learned-controller runtime comparison is withdrawn
@@ -702,9 +706,9 @@ presented as a direct learned-policy improvement.
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=0.85\textwidth]{sysparams_bar_comparison.png}
-    \caption{Runtime parameters for the measured fixed baseline and deterministic
+    \caption{\hl{Runtime parameters for the measured fixed baseline and deterministic
         controller. Processed FPS counts frames sent to YOLO; source coverage
-        additionally accounts for frames bypassed by intentional skipping.}
+        additionally accounts for frames bypassed by intentional skipping.}}
     \label{fig:sysparams_bar}
 \end{figure*}
 
@@ -728,10 +732,10 @@ long-term thermal stability.
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=0.85\textwidth]{sysparams_timeseries.png}
-    \caption{Archived runtime plot retained for traceability. The source
+    \caption{\hl{Archived runtime plot retained for traceability. The source
     records do not support a learned-controller comparison, so the figure is
     not interpreted as evidence of learned-policy superiority or deterministic
-    end-to-end latency.}
+    end-to-end latency.}}
     \label{fig:sysparams_timeseries}
 \end{figure*}
 
@@ -757,9 +761,9 @@ does not establish live adaptive deployment.
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=0.85\textwidth]{accuracy_comparison_bar.png}
-    \caption{Preliminary detection comparison on 51 labeled test images at
+    \caption{\hl{Preliminary detection comparison on 51 labeled test images at
     IoU$=0.5$. The baseline uses $640\times640$ input resolution and the
-    archived policy condition uses 320 pixels with simulated state inputs.}
+    archived policy condition uses 320 pixels with simulated state inputs.}}
     \label{fig:accuracy_comparison}
 \end{figure*}
 
@@ -882,8 +886,8 @@ dedicated small-object evaluation across the tested resolutions would be
 required to quantify this effect explicitly. The present results instead
 report the aggregate metrics available from the evaluated test set.
 
-\begin{highlight}
 \subsection{Limits on Learning and Thermal Claims}
+\begin{highlight}
 Thermal inertia motivates a learned controller in principle, but the current
 artifacts do not demonstrate anticipation. The available Phase~5 procedure is
 reward-filtered behavioral cloning over a static set of recorded transitions;
@@ -1016,9 +1020,7 @@ modelled and are not reflected in the reported metrics. If the system were
 extended to an edge-cloud deployment, these additional latency components
 would need to be incorporated into the evaluation.
 
-\begin{highlight}
 \subsection{Offline Exploration and Policy Status}
-\end{highlight}
 
 \begin{highlight}
 Exploratory actions are used exclusively during offline data collection
@@ -1065,8 +1067,8 @@ evaluation requirement.
 \subsection{Generalization to Other Models}
 While this study utilized YOLOv8n, the Learned Adaptive Inference System is inherently model-agnostic. The defined action space modulates universal pipeline parameters---input resolution and frame-skip probability---rather than internal model weights. Consequently, the controller can be integrated with other detection or classification architectures, provided the action space is reprofiled for the target model's computational cost curve.
 
-\begin{highlight}
 \subsection{Future Research Directions}
+\begin{highlight}
 The next evaluation should include repeated 30-minute Raspberry Pi~5 runs
 with explicit throttle-state records, a randomized comparison of fixed,
 heuristic, and learned controllers, resolution-only and skip-only ablations,
@@ -1082,11 +1084,13 @@ remote compute time rather than inferring them from local inference logs.
 
 \section{Conclusion}
 \label{sec:conclusion}
+\begin{highlight}
 Deploying object detection on resource-constrained edge devices requires
 measuring the trade-off between detection workload and hardware conditions.
 This paper presented a modular adaptive-inference pipeline that adjusts image
 resolution and frame-processing frequency using CPU utilization, RAM
 utilization, core temperature, FPS, and per-frame latency telemetry.
+\end{highlight}
 
 The system was developed in a structured six-phase pipeline. Phase~0
 established an empirical Raspberry Pi~5 baseline showing that a fixed
