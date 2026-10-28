@@ -7,6 +7,8 @@
 \usepackage{textcomp}
 \usepackage{xcolor}
 \usepackage{soul}
+\usepackage{mdframed}
+\newmdenv[hidealllines=true,backgroundcolor=yellow,innerleftmargin=2pt,innerrightmargin=2pt,innertopmargin=2pt,innerbottommargin=2pt]{highlight}
 \usepackage{hyperref}
 \usepackage{url}
 \usepackage{booktabs}
@@ -47,17 +49,21 @@
 
 \corresp{Corresponding author: Rajeswara Rao K V S (e-mail: rajeswararaokvs@rvce.edu.in).}
 
+\begin{highlight}
 \begin{abstract}
 Deploying object detection on resource-constrained edge hardware requires balancing detection workload against available computation and thermal headroom. This paper presents a modular adaptive-inference study for YOLOv8n, using CPU utilization, RAM consumption, core temperature, frame rate, and latency as telemetry signals. The system contains fixed operating points, a reactive heuristic controller, and an offline reward-filtered behavioral-cloning policy whose parameters are frozen before inference. The Raspberry Pi~5 measurements establish the runtime trade-off between fixed input resolutions and frame skipping; the learned-policy analyses are reported separately because the available policy evaluation uses recorded or simulated states rather than a completed sustained hardware-in-the-loop deployment.
+\end{highlight}
 
-\hl{Deploying object detection on resource-constrained edge hardware requires balancing detection workload against available computation and thermal headroom. This paper presents a modular adaptive-inference study for YOLOv8n, using CPU utilization, RAM consumption, core temperature, frame rate, and latency as telemetry signals. The system contains fixed operating points, a reactive heuristic controller, and an offline reward-filtered behavioral-cloning policy whose parameters are frozen before inference. The Raspberry Pi~5 measurements establish the runtime trade-off between fixed input resolutions and frame skipping; the learned-policy analyses are reported separately because the available policy evaluation uses recorded or simulated states rather than a completed sustained hardware-in-the-loop deployment.}
-
-\hl{In the recorded Raspberry Pi~5 runs, fixed $640\times640$ inference achieved approximately $3.31$ processed FPS, while the deterministic operating-point experiments reached higher processed throughput at lower resolutions with an explicit reduction in source-frame coverage. The offline dataset contains 3,033 transitions, and the exported policy is versioned with dataset and training provenance. Accuracy results are treated as a resolution-dependent trade-off and are not interpreted as evidence of standard mAP improvement or thermal-throttling prevention. This separation between measured hardware behavior and offline policy analysis provides a reproducible basis for future closed-loop validation without claiming unperformed experiments.}
+\begin{highlight}
+In the recorded Raspberry Pi~5 runs, fixed $640\times640$ inference achieved approximately $3.31$ processed FPS, while the deterministic operating-point experiments reached higher processed throughput at lower resolutions with an explicit reduction in source-frame coverage. The offline dataset contains 3,033 transitions, and the exported policy is versioned with dataset and training provenance. Accuracy results are treated as a resolution-dependent trade-off and are not interpreted as evidence of standard mAP improvement or thermal-throttling prevention. This separation between measured hardware behavior and offline policy analysis provides a reproducible basis for future closed-loop validation without claiming unperformed experiments.
 \end{abstract}
+\end{highlight}
 
+\begin{highlight}
 \begin{keywords}
 Adaptive Inference, YOLOv8, Edge Computing, Offline Behavioral Cloning, Thermal Management, Pothole Detection, Raspberry Pi, Dynamic Resolution Scaling, Frame Skipping, Telemetry-Driven Control, Resource-Constrained Inference, IoT Edge Deployment.
 \end{keywords}
+\end{highlight}
 
 \titlepgskip=-15pt
 
@@ -76,11 +82,16 @@ Current deployment strategies generally treat inference pipelines as static conf
 
 The static paradigm assumes that the edge device can consistently dissipate heat and sustain peak processing speeds. However, when thermal throttling occurs, the software continues demanding a fixed computational workload while the hardware's available computational capacity diminishes. This mismatch can result in reduced frame rates, increased latency, missed detections, and, in the worst case, system failure. A robust edge AI system must monitor its operational state and dynamically adjust its computational demands to preserve overall stability and responsiveness.
 
+\begin{highlight}
 \subsection{Proposed Solution: Adaptive Inference}
 To address these challenges, an adaptive YOLOv8 inference system is introduced. The system exposes two tunable control parameters at runtime: the input resolution $imgsz \in [256, 640]$ (constrained to multiples of 32) and the frame-skip probability $p_{skip} \in [0, 1]$, which determines the proportion of incoming frames that bypass the forward pass entirely. Together, these parameters define a workload-control space for studying trade-offs between detection fidelity and computational demand.
+\end{highlight}
 
+\begin{highlight}
 A dedicated monitoring module samples five hardware telemetry signals asynchronously at 2\,Hz—CPU utilization, RAM utilization, core temperature, smoothed inference frame rate, and per-frame latency—maintaining a thread-safe state vector $s_t$ accessible to the inference loop in $\mathcal{O}(1)$ time. A lightweight neural controller can read $s_t$ at each decision step and emit a continuous action pair $(imgsz_t,\; p_{skip,t})$. In this study, the controller is trained offline and is not credited with validated closed-loop balancing until a hardware-in-the-loop rollout is completed.
+\end{highlight}
 
+\begin{highlight}
 The resource management problem is formulated as a Markov Decision Process (MDP), enabling the system to be developed and evaluated through a rigorous offline reinforcement learning workflow:
 \begin{enumerate}
     \item \textbf{Baseline Profiling}: Characterizing the computational behavior of a fixed $640 \times 640$ static pipeline under the available Raspberry Pi~5 run.
@@ -88,6 +99,7 @@ The resource management problem is formulated as a Markov Decision Process (MDP)
     \item \textbf{Heuristic Control (Baseline)}: A rule-based controller that selects from three discrete configurations—$M_0\!=\!(640,0)$, $M_1\!=\!(480,1)$, $M_2\!=\!(320,2)$—using CPU load, RAM utilization, and temperature thresholds. This serves as a strong interpretable baseline against which the learned policy is evaluated.
     \item \textbf{Offline Policy Learning via Filtered Behavioral Cloning}: The collected transitions are filtered to retain the top 30\% by reward. A Continuous Actor network is then trained offline via supervised regression on these transitions, learning to map $s_t$ to continuous $(imgsz, p_{skip})$ actions. This produces a reproducible offline policy artifact without online interaction during training; it does not by itself establish thermal anticipation or long-term optimization.
 \end{enumerate}
+\end{highlight}
 
 \subsection{Structure of the Paper}
 The remainder of this paper is organized as follows: Section \ref{sec:related_work} reviews existing research on edge object detection, thermal management, and dynamic inference. Section \ref{sec:architecture} describes the proposed system architecture, including hardware monitoring and inference execution layers. The step-by-step methodology, progressing from baseline profiling to reinforcement learning, is detailed in Section \ref{sec:methodology}. Experimental results are presented in Section \ref{sec:experiments}, followed by a discussion of the findings and limitations in Section \ref{sec:discussion}. Finally, Section \ref{sec:conclusion} concludes the paper and suggests directions for future research.
@@ -379,6 +391,7 @@ basis for the heuristic thresholds introduced in the subsequent phase.
 
 \subsubsection*{Phase~1 Observations and Trade-off Analysis}
 
+\begin{highlight}
 The experimental results demonstrate a clear trade-off between computational
 workload and detection performance, as shown in Fig.~\ref{fig:phase1_mode_summary}.
 As the operating configuration moves from $M_0$ toward the lower-workload
@@ -389,13 +402,16 @@ source-coverage rates were approximately $3.08$, $9.96$, and $21.28$ source
 frames per second because skipped frames were not sent to YOLO. P95 latency
 decreased from approximately $449.1$~ms for $M_0$ to $261.5$~ms for $M_1$
 and $171.1$~ms for $M_2$.
+\end{highlight}
 
+\begin{highlight}
 However, the improvement in processed throughput is accompanied by reduced
 source-frame coverage and changes in detection diagnostics. Detection count
 and confidence are runtime observations, not substitutes for ground-truth
 precision, recall, or AP. Thus, more aggressive workload reduction improves
 processed throughput and latency while changing the temporal availability of
 detections.
+\end{highlight}
 
 These observations show that the three operating configurations represent
 different workload--performance trade-offs rather than uniformly improving
@@ -470,6 +486,7 @@ memory utilization. The controller is stateless, with each decision made
 independently of the previous mode; consequently, no hysteresis or recovery
 timer is applied.
 
+\begin{highlight}
 This deterministic controller demonstrates that adaptive workload control
 can be achieved using simple and auditable rules. However, its fixed
 thresholds restrict the controller to three predefined operating points.
@@ -477,6 +494,7 @@ The subsequent offline policy-learning stage analyzes a continuous policy
 over $(imgsz_t,p_{skip,t})$. It is not treated as a validated replacement for
 the deterministic controller until a dedicated hardware-in-the-loop experiment
 has been completed.
+\end{highlight}
 
 \subsection{Phase 4: MDP Formulation and Offline Data Collection}
 
@@ -649,12 +667,15 @@ evaluation artifacts.
 \subsection{Experimental Setup}
 \label{subsec:exp_setup}
 
+\begin{highlight}
 The runtime evaluation compares fixed operating points and a deterministic
 heuristic controller on the available target runs. The baseline uses a fixed
 $640\times640$ input resolution; the heuristic selects among the
 characterized operating points using CPU and RAM thresholds. The offline
 policy is evaluated separately from recorded or simulated states.
+\end{highlight}
 
+\begin{highlight}
 For the accuracy evaluation, the two configurations are compared on 51
 labeled test images using an Intersection-over-Union (IoU) threshold of
 $0.5$. The baseline uses a fixed $640\times640$ input resolution, while the
@@ -662,6 +683,7 @@ archived policy condition uses a fixed selected image size of 320 pixels.
 Precision, recall, and F1-score are reported as preliminary IoU-thresholded
 metrics; the historical per-image precision average is not called standard
 mAP@0.5.
+\end{highlight}
 
 The runtime evaluation records inference FPS, per-frame latency, CPU
 utilization, RAM utilization, and the image size selected by the adaptive
@@ -669,8 +691,11 @@ controller. These measurements characterize local inference behavior and do
 not constitute an end-to-end latency measurement involving network
 transmission or remote computation.
 
+\begin{highlight}
 \subsection{Runtime Performance of the Measured Operating Points}
+\end{highlight}
 
+\begin{highlight}
 The previously reported learned-controller runtime comparison is withdrawn
 because its source records are not available in the repository. The
 reproducible Raspberry Pi~5 baseline instead achieved $3.31$ processed FPS
@@ -680,7 +705,9 @@ $5.02$ processed FPS over an 80-second run, with approximately $8.5$
 source frames per second when intentional frame skipping is included in the
 source-coverage calculation. These are different quantities and are not
 presented as a direct learned-policy improvement.
+\end{highlight}
 
+\begin{highlight}
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=0.85\textwidth]{sysparams_bar_comparison.png}
@@ -689,20 +716,26 @@ presented as a direct learned-policy improvement.
         additionally accounts for frames bypassed by intentional skipping.}
     \label{fig:sysparams_bar}
 \end{figure*}
+\end{highlight}
 
+\begin{highlight}
 The measured baseline recorded mean CPU utilization of approximately $53.2\%$
 and mean RAM utilization of approximately $29.5\%$. The deterministic
 controller run recorded approximately $52.0\%$ CPU and $29.9\%$ RAM. These
 values come from separate logged runs and should be interpreted as runtime
 characterization, not as a controlled paired estimate of resource savings.
+\end{highlight}
 
+\begin{highlight}
 The temporal behavior is reported using the raw CSV logs rather than the
 unavailable learned-controller trace. The Phase~0 run reached a mean
 temperature of approximately $56.6^\circ$C and a maximum of approximately
 $60.6^\circ$C; no thermal-throttle event was recorded during that run.
 This observation is bounded by the 213-second duration and does not establish
 long-term thermal stability.
+\end{highlight}
 
+\begin{highlight}
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=0.85\textwidth]{sysparams_timeseries.png}
@@ -712,13 +745,17 @@ long-term thermal stability.
     end-to-end latency.}
     \label{fig:sysparams_timeseries}
 \end{figure*}
+\end{highlight}
 
+\begin{highlight}
 The recorded latency traces exhibit transient spikes. The reported FPS and
 latency values describe local inference execution and do not include network
 transmission, communication queueing, or remote computation delays.
+\end{highlight}
 
 \subsection{Detection Accuracy and Fidelity Trade-off}
 
+\begin{highlight}
 The archived 51-image comparison is retained only as a preliminary
 IoU-thresholded analysis. Its values are not called standard mAP because the
 original script computed the arithmetic mean of per-image precision values.
@@ -727,7 +764,9 @@ $61.18\%$, $70.27\%$, and $65.41\%$, respectively, versus
 $67.24\%$, $52.70\%$, and $59.09\%$ for the fixed 320-pixel policy
 condition. The policy condition used a simulated state schedule and therefore
 does not establish live adaptive deployment.
+\end{highlight}
 
+\begin{highlight}
 \begin{figure*}[t!]
     \centering
     \includegraphics[width=0.85\textwidth]{accuracy_comparison_bar.png}
@@ -736,12 +775,15 @@ does not establish live adaptive deployment.
     archived policy condition uses 320 pixels with simulated state inputs.}
     \label{fig:accuracy_comparison}
 \end{figure*}
+\end{highlight}
 
+\begin{highlight}
 The archived comparison indicates a precision increase but a substantial
 recall and F1 reduction at 320 pixels. Because the labels and evaluation
 script do not provide a complete larger-set AP analysis or a small-object
 stratification, these values are reported as preliminary detection metrics
 rather than generalized accuracy claims.
+\end{highlight}
 
 These results demonstrate that the runtime improvement is accompanied by a
 measurable perception-level trade-off. The adaptive configuration does not
@@ -751,11 +793,13 @@ is slightly higher. Therefore, the adaptive controller should be interpreted
 as a workload--accuracy trade-off mechanism rather than as a method that
 simultaneously improves all detection metrics.
 
+\begin{highlight}
 The archived policy condition selected 320 pixels, not an average of 400
 pixels. The pixel-area reduction relative to 640 pixels is therefore
 $1-(320/640)^2=75\%$, a derived workload quantity rather than a measured
 energy or latency saving. Small-object performance remains an evaluation
 gap and is identified as future work.
+\end{highlight}
 
 \subsection{Per-Image Detection Behavior}
 
@@ -791,6 +835,7 @@ samples.
 
 \subsection{Runtime--Accuracy Trade-off}
 
+\begin{highlight}
 Taken together, Figs.~\ref{fig:sysparams_bar}--\ref{fig:f1_scatter} show the
 central trade-off introduced by adaptive workload control. The measured
 operating-point results show higher processed throughput at lower
@@ -798,6 +843,7 @@ resolutions, while the preliminary 51-image policy comparison shows higher
 precision but lower recall and F1 at 320 pixels. The latter uses a simulated
 state schedule and a nonstandard historical ``mAP@0.5'' calculation, so it
 is not treated as evidence of a learned-controller gain.
+\end{highlight}
 
 The runtime measurements therefore indicate that adaptive workload
 reduction can substantially improve local inference throughput and latency,
@@ -807,11 +853,13 @@ universally superior to fixed-resolution inference; rather, they demonstrate
 that computational workload can be reduced at the cost of measurable changes
 in detection fidelity.
 
+\begin{highlight}
 The CPU measurements provide an additional observation: changing the
 workload does not guarantee low CPU occupancy. The appropriate conclusion is
 that resolution and frame skipping change processed throughput and source
 coverage; they do not by themselves establish a fixed CPU reduction or a
 hard real-time guarantee.
+\end{highlight}
 
 
 \subsection{Scope of the Runtime Measurements}
@@ -848,6 +896,7 @@ dedicated small-object evaluation across the tested resolutions would be
 required to quantify this effect explicitly. The present results instead
 report the aggregate metrics available from the evaluated test set.
 
+\begin{highlight}
 \subsection{Limits on Learning and Thermal Claims}
 Thermal inertia motivates a learned controller in principle, but the current
 artifacts do not demonstrate anticipation. The available Phase~5 procedure is
@@ -858,6 +907,7 @@ the learned policy anticipates thermal exhaustion, improves long-term
 throughput, or lowers peak temperature. Those claims require repeated
 closed-loop runs with throttle-state records and a pre-registered comparison
 against the deterministic controller.
+\end{highlight}
 
 \subsection{Interpretation of Baseline and Deterministic Control Results}
 
@@ -869,12 +919,14 @@ reduced this mismatch by selecting lower-workload configurations when resource
 utilization increased, improving the measured throughput and reducing the
 frame-drop rate while keeping the observed core temperature below $60^\circ$C.
 
+\begin{highlight}
 These results should not be interpreted as evidence that the controller
 eliminates all frame loss or guarantees hard real-time behavior. The remaining
 frame drops and repeated mode changes demonstrate the limitation of a
 stateless, threshold-based policy. This limitation motivates the offline policy analysis, while the
 state--action--reward data is not by itself evidence of a validated
 long-term controller.
+\end{highlight}
 
 \subsection{Interpretation of Offline Controller Development}
 
@@ -978,8 +1030,11 @@ modelled and are not reflected in the reported metrics. If the system were
 extended to an edge-cloud deployment, these additional latency components
 would need to be incorporated into the evaluation.
 
+\begin{highlight}
 \subsection{Offline Exploration and Policy Status}
+\end{highlight}
 
+\begin{highlight}
 Exploratory actions are used exclusively during offline data collection
 (Phase~4). The data collection controller samples actions uniformly at random
 from $[-1,1]^2$ in a bounded session and records 3,033 transitions in the
@@ -989,6 +1044,7 @@ deterministic when loaded, but a completed sustained Raspberry Pi~5
 hardware-in-the-loop evaluation of this actor is not claimed in this paper.
 Consequently, the actor is presented as an offline policy artifact and
 analysis target rather than as a validated long-term thermal optimizer.
+\end{highlight}
 
 \subsection{State Design and Future Context-Aware Extensions}
 
@@ -1006,6 +1062,7 @@ claimed or implied.
 
 \subsection{Reward Coefficient Selection and Sensitivity}
 
+\begin{highlight}
 The reward coefficients ($10, 0.5, 0.1, -50, -10$) were selected to
 reflect the intended engineering hierarchy: proxy detection quality as the
 primary objective, throughput as a secondary objective, latency penalized,
@@ -1017,10 +1074,12 @@ repository records the component values and permits offline reweighting, but
 does not establish that these coefficients are optimal. Sensitivity to
 weights, filtering thresholds, and decision intervals remains an explicit
 evaluation requirement.
+\end{highlight}
 
 \subsection{Generalization to Other Models}
 While this study utilized YOLOv8n, the Learned Adaptive Inference System is inherently model-agnostic. The defined action space modulates universal pipeline parameters---input resolution and frame-skip probability---rather than internal model weights. Consequently, the controller can be integrated with other detection or classification architectures, provided the action space is reprofiled for the target model's computational cost curve.
 
+\begin{highlight}
 \subsection{Future Research Directions}
 The next evaluation should include repeated 30-minute Raspberry Pi~5 runs
 with explicit throttle-state records, a randomized comparison of fixed,
@@ -1033,7 +1092,9 @@ state vector with scene-level features could enable context-aware
 adaptation. Finally, extending the system into a hybrid edge-cloud
 architecture would require measuring communication delay, queueing, and
 remote compute time rather than inferring them from local inference logs.
+\end{highlight}
 
+\begin{highlight}
 \section{Conclusion}
 \label{sec:conclusion}
 Deploying object detection on resource-constrained edge devices requires
@@ -1041,6 +1102,7 @@ measuring the trade-off between detection workload and hardware conditions.
 This paper presented a modular adaptive-inference pipeline that adjusts image
 resolution and frame-processing frequency using CPU utilization, RAM
 utilization, core temperature, FPS, and per-frame latency telemetry.
+\end{highlight}
 
 The system was developed in a structured six-phase pipeline. Phase~0
 established an empirical Raspberry Pi~5 baseline showing that a fixed
@@ -1064,6 +1126,7 @@ policy as a frozen TorchScript module that performs sub-millisecond
 deterministic inference on the Raspberry Pi~5 CPU without any online
 learning during deployment.
 
+\begin{highlight}
 Together, the results demonstrate a measured operating-point trade-off and
 provide an auditable offline policy artifact. They do not establish learned
 controller superiority, long-term thermal optimization, or safety guarantees.
@@ -1071,6 +1134,7 @@ The next step is a repeated hardware-in-the-loop evaluation with explicit
 throttle logging, standard accuracy metrics, and video-level missed-detection
 analysis. Hybrid edge-cloud execution remains a complementary future
 direction.
+\end{highlight}
 
 \begin{thebibliography}{99}
 
